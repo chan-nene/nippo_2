@@ -507,3 +507,9 @@ html body .settings-field-help {
   font-size: var(--font-12);
   line-height: 1.5;
 }
+
+html body .settings-check-copy .settings-check-note {
+  color: var(--text-muted);
+  font-size: var(--font-12);
+  font-weight: 400;
+}

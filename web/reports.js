@@ -509,6 +509,7 @@ function movePeriodPresetFocus(index) {
 
 function syncPeriodPresets(config = {}) {
   const controlsBusy = state.isBusy && state.busyAction !== "save";
+  if ($("showHolidays")) $("showHolidays").disabled = controlsBusy;
   $("reportPanel")?.classList.toggle(
     "is-missing-mode",
     state.showMissingCommentsOnly,
@@ -1670,6 +1671,7 @@ function renderReportRows(rows, context, hasPreviousGroups = false) {
           displayName,
           rowSpan: group.rows.length,
           showUserCell: idx === 0,
+          isGroupEnd: idx === group.rows.length - 1,
           showGroupDivider: (hasPreviousGroups || groupIndex > 0) && idx === 0,
         }))
         .join("");
@@ -1690,6 +1692,7 @@ function renderReportRow(row, idx, context, memberContext) {
   const rowClass = [
     renderReportRowClass(row, idx, context),
     memberContext.showGroupDivider ? "member-group-start" : "",
+    memberContext.isGroupEnd ? "member-group-end" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -2757,6 +2760,9 @@ function getFilteredRows() {
       .map((member) => member.employee_id),
   );
   let visibleRows = filteredByDate.filter((row) => allowedIds.has(row.employee_id));
+  if (!state.showHolidays) {
+    visibleRows = visibleRows.filter((row) => !row.is_holiday || rowHasReportData(row));
+  }
   if (state.showMissingCommentsOnly) {
     visibleRows = visibleRows.filter(rowMatchesMissingCommentFilter);
   }

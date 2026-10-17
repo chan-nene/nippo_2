@@ -128,6 +128,7 @@ class AppSettings:
     include_today_in_missing_comments: bool = False
     include_empty_report_days_in_missing_comments: bool = True
     comment_signature: str = ""
+    ui_show_holidays: bool = True
     ui_period_preset: str = "default"
     ui_start_date: str = ""
     ui_end_date: str = ""

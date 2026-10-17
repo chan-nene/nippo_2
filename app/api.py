@@ -240,6 +240,7 @@ class DailyReportApi:
                 candidate = replace(
                     self._settings,
                     ui_period_preset=preset,
+                    ui_show_holidays=payload.get("ui_show_holidays", self._settings.ui_show_holidays),
                     ui_start_date=str(payload.get("start_date", "")).strip(),
                     ui_end_date=str(payload.get("end_date", "")).strip(),
                     ui_font_size=self._validated_font_size(payload.get("font_size")),

@@ -797,10 +797,13 @@ def validate_settings_request(payload: Any) -> Mapping[str, Any]:
 
 def validate_ui_state_request(payload: Any) -> Mapping[str, Any]:
     source = require_request_mapping(payload, "表示状態")
+    if "ui_show_holidays" in source and not isinstance(source["ui_show_holidays"], bool):
+        raise RequestValidationError("休日表示の指定が不正です。")
     _reject_unknown_keys(
         source,
         {
             "period_preset",
+            "ui_show_holidays",
             "start_date",
             "end_date",
             "font_size",

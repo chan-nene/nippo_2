@@ -430,6 +430,12 @@ function bindEvents() {
 
   initializePeriodPresetControl();
 
+  $("showHolidays")?.addEventListener("change", () => {
+    finishEditing();
+    state.showHolidays = $("showHolidays").checked;
+    renderTable();
+    persistUiState();
+  });
   $("periodPrevButton")?.addEventListener("click", () => shiftDateRange(-1));
   $("periodNextButton")?.addEventListener("click", () => shiftDateRange(1));
 
@@ -565,6 +571,8 @@ function syncFlatpickrDateInput(inputId) {
 }
 
 function restoreUiState(settings) {
+  state.showHolidays = settings.ui_show_holidays !== false;
+  $("showHolidays").checked = state.showHolidays;
   state.memberFilterPreference = settings.ui_member_filter_levels;
   applyColorAppearance(settings.ui_color_theme, settings.ui_color_palette);
   state.memberFilterLevels = normalizeMemberFilterLevels(
@@ -633,6 +641,7 @@ function persistUiState() {
     ["month", "week", ""].includes(state.activePeriodPreset);
   const payload = {
     period_preset: periodPreset,
+    ui_show_holidays: state.showHolidays === true,
     start_date: shouldPersistDates ? state.startDate : "",
     end_date: shouldPersistDates ? state.endDate : "",
     font_size: state.fontSize,

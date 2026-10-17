@@ -1119,6 +1119,14 @@ html body .rich-text-editor {
   outline: none;
   cursor: text;
 }
+/* The cell/card already draws the 2px editing frame. Override the shared
+   [tabindex]:focus-visible ring so the rich editor does not add a second one. */
+html body .rich-text-editor:focus,
+html body .rich-text-editor:focus-visible {
+  outline: none;
+  outline-width: 0;
+  outline-offset: 0;
+}
 html body .reply-card .rich-text-editor { padding: 0; min-height: 1.35em; }
 html body .editable-content strong { font-weight: 700; }
 html body .editable-content u { text-decoration: underline; text-underline-offset: 2px; }
@@ -1567,6 +1575,22 @@ html body #reportPanel table :is(th, td).date-col {
 html body #reportPanel table thead th:first-child,
 html body #reportPanel table tbody th.user-col {
   border-left: 1px solid var(--table-border);
+}
+
+/* Match member labels to the header; separate members across the whole table. */
+html body #reportPanel table tbody th.user-col {
+  background: var(--table-header-bg);
+
+}
+
+
+html body #reportPanel table tbody th.user-col,
+html body #reportPanel table tbody tr.member-group-end > td {
+  border-bottom: 2px solid var(--border-strong);
+}
+
+html body #reportPanel table tbody tr.member-group-start > :is(th, td) {
+  border-top: 0;
 }
 
 /* Refresh-button style data reload action. */
@@ -2206,4 +2230,30 @@ html body #reportPanel #showMissingCommentsButton .missing-count-badge {
 }
 html body #reportPanel.is-missing-mode .period-date-range {
   display: none;
+}
+
+/* Keep holiday visibility anchored to the right-hand action group. */
+html body .holiday-visibility-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--text);
+}
+html body .holiday-visibility-control input { margin: 0; accent-color: var(--primary); }
+@media (max-width: 1100px) {
+  html body #reportPanel .toolbar-filter-row .period-main-controls,
+  html body #reportPanel.is-missing-mode .toolbar-filter-row .period-main-controls {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    flex-wrap: wrap;
+  }
+  html body #reportPanel .toolbar-filter-row .toolbar-right,
+  html body #reportPanel.is-missing-mode .toolbar-filter-row .toolbar-right {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: end;
+    justify-content: flex-end;
+  }
 }

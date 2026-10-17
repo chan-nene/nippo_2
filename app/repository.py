@@ -1150,6 +1150,15 @@ class DailyReportRepository:
         candidates = pl.DataFrame({"employee_id": subordinate_ids}).lazy().join(
             days, how="cross"
         )
+        holiday_reports = users_df.lazy().cast(pl.String).filter(
+            (pl.col("record_type") == "report")
+            & pl.col("employee_id").is_in(subordinate_ids)
+            & pl.col("date").is_in([day.isoformat() for day in holiday_dates])
+            & pl.col("date").is_between(pl.lit(range_start.isoformat()), pl.lit(range_end.isoformat()))
+            & ((pl.col("business_name").fill_null("").str.strip_chars() != "")
+               | (pl.col("business_detail").fill_null("").str.strip_chars() != ""))
+        ).select("employee_id", "date")
+        candidates = pl.concat([candidates, holiday_reports]).unique()
         if not self.settings.include_empty_report_days_in_missing_comments:
             report_days = users_df.lazy().cast(pl.String).filter(
                 (pl.col("record_type") == "report")
@@ -1623,7 +1632,9 @@ class DailyReportRepository:
             pl.col("can_edit_my_comment")
             & (pl.col("_day") <= today)
             & (pl.col("_my_comment").str.strip_chars() == "")
-            & (~pl.col("is_holiday"))
+            & ((~pl.col("is_holiday"))
+               | (pl.col("business_name").str.strip_chars() != "")
+               | (pl.col("business_detail").str.strip_chars() != ""))
             & pl.lit(employee_id not in failed_comment_ids)
             & ((pl.col("_day") < today) | pl.lit(self.settings.include_today_in_missing_comments))
         )
