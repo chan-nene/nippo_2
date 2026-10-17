@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="ja" data-theme="light" data-color-palette="blue">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; media-src 'none'; worker-src 'none'"
+    />
+    <script src="./startup-appearance.js?v=20260921-01"></script>
+    <title>NIPPO | 日報</title>
+    <link rel="stylesheet" href="./fonts.css?v=20260921-01" />
+
+    <link rel="stylesheet" href="./styles.css?v=20260919-04" />
+    <link rel="stylesheet" href="./reports.css?v=20261017-01" />
+    <link rel="stylesheet" href="./settings.css?v=20260919-04" />
+    <link rel="stylesheet" href="./admin.css?v=20260906-01" />
+    <link rel="stylesheet" href="./vendor/flatpickr.min.css?v=20260830-18" />
+    <link rel="stylesheet" href="./vendor/tabulator.min.css?v=20260830-18" />
+  </head>
+  <body data-font-size="standard">
+    <dialog id="startupDialog" aria-label="起動中" style="border:0;border-radius:12px;padding:28px 40px;">
+      <p id="startupMessage" role="status">読み込み中です…</p>
+    </dialog>
+    <header class="title-bar">
+      <div class="title-bar-leading">
+        <div class="title-bar-brand">
+          <span class="title-bar-title">NIPPO</span>
+        </div>
+      </div>
+      <div class="title-bar-actions" aria-label="アプリ操作">
+        <div id="fontSizeControl" class="font-size-control">
+          <button
+            id="fontSizeButton"
+            class="header-icon-button font-size-button"
+            type="button"
+            aria-label="表示調整（文字サイズ・列幅）"
+            title="表示調整（文字サイズ・列幅）"
+            aria-haspopup="true"
+            aria-expanded="false"
+          >
+            <svg width="28" height="20" viewBox="0 0 28 20" fill="none" aria-hidden="true" focusable="false">
+              <text x="1" y="15" fill="currentColor" font-size="13">Aa</text>
+              <path d="m21 10 3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <div
+            id="fontSizeMenu"
+            class="font-size-menu hidden"
+            role="group"
+            aria-label="表示調整"
+          >
+            <div class="font-size-options">
+              <button type="button" data-font-size="compact" aria-pressed="false">極小</button>
+              <button type="button" data-font-size="standard" aria-pressed="true">小</button>
+              <button type="button" data-font-size="medium" aria-pressed="false">中</button>
+              <button type="button" data-font-size="large" aria-pressed="false">大</button>
+              <button type="button" data-font-size="xlarge" aria-pressed="false">極大</button>
+            </div>
+            <div class="font-size-menu-divider" aria-hidden="true"></div>
+            <button id="fitColumnWidthsButton" class="font-size-menu-reset" type="button">
+              列幅を画面に合わせる
+            </button>
+            <button id="resetColumnWidthsButton" class="font-size-menu-reset" type="button">
+              列幅を初期値に戻す
+            </button>
+          </div>
+        </div>
+        <div
+          id="colorThemeControl"
+          class="theme-mode-switch"
+          role="group"
+          aria-label="配色モード"
+          dir="ltr"
+          data-size="md"
+          data-gutter-size="xs"
+          tabindex="0"
+        >
+          <div class="theme-indicator" aria-hidden="true"></div>
+          <button
+            id="lightThemeButton"
+            type="button"
+            role="radio"
+            aria-label="ライトモード"
+            data-theme-option="light"
+            data-state="on"
+            aria-checked="true"
+            tabindex="0"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path fill="currentColor" fill-rule="evenodd" d="M12 1C12.5523 1 13 1.44772 13 2V4C13 4.55228 12.5523 5 12 5C11.4477 5 11 4.55228 11 4V2C11 1.44772 11.4477 1 12 1ZM4.22183 4.22183C4.61235 3.8313 5.24551 3.8313 5.63604 4.22183L7.05025 5.63604C7.44078 6.02656 7.44078 6.65973 7.05025 7.05025C6.65973 7.44078 6.02656 7.44078 5.63604 7.05025L4.22183 5.63604C3.8313 5.24551 3.8313 4.61235 4.22183 4.22183ZM19.7782 4.22183C20.1687 4.61235 20.1687 5.24551 19.7782 5.63604L18.364 7.05025C17.9734 7.44078 17.3403 7.44078 16.9497 7.05025C16.5592 6.65973 16.5592 6.02656 16.9497 5.63604L18.364 4.22183C18.7545 3.8313 19.3876 3.8313 19.7782 4.22183ZM12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9ZM7 12C7 9.23858 9.23858 7 12 7C14.7614 7 17 9.23858 17 12C17 14.7614 14.7614 17 12 17C9.23858 17 7 14.7614 7 12ZM1 12C1 11.4477 1.44772 11 2 11H4C4.55228 11 5 11.4477 5 12C5 12.5523 4.55228 13 4 13H2C1.44772 13 1 12.5523 1 12ZM19 12C19 11.4477 19.4477 11 20 11H22C22.5523 11 23 11.4477 23 12C23 12.5523 22.5523 13 22 13H20C19.4477 13 19 12.5523 19 12ZM7.05025 16.9497C7.44078 17.3403 7.44078 17.9734 7.05025 18.364L5.63604 19.7782C5.24551 20.1687 4.61235 20.1687 4.22183 19.7782C3.8313 19.3876 3.8313 18.7545 4.22183 18.364L5.63604 16.9497C6.02656 16.5592 6.65973 16.5592 7.05025 16.9497ZM16.9497 16.9497C17.3403 16.5592 17.9734 16.5592 18.364 16.9497L19.7782 18.364C20.1687 18.7545 20.1687 19.3876 19.7782 19.7782C19.3877 20.1687 18.7545 20.1687 18.364 19.7782L16.9497 18.364C16.5592 17.9734 16.5592 17.3403 16.9497 16.9497ZM12 19C12.5523 19 13 19.4477 13 20V22C13 22.5523 12.5523 23 12 23C11.4477 23 11 22.5523 11 22V20C11 19.4477 11.4477 19 12 19Z" />
+            </svg>
+          </button>
+          <button
+            id="darkThemeButton"
+            type="button"
+            role="radio"
+            aria-label="ダークモード"
+            data-theme-option="dark"
+            data-state="off"
+            aria-checked="false"
+            tabindex="-1"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path fill="currentColor" d="M12.7836 2.47048C12.9676 2.76512 12.9855 3.13415 12.8309 3.44525C12.2994 4.51497 12 5.7211 12 7.00001C12 11.4183 15.5817 15 20 15L20.0575 14.9998C20.4049 14.9974 20.7287 15.1754 20.9127 15.47C21.0968 15.7647 21.1147 16.1337 20.9601 16.4448C19.325 19.7352 15.9279 22 12 22C6.47715 22 2 17.5229 2 12C2 6.50107 6.43841 2.03886 11.9284 2.00027C12.2758 1.99783 12.5995 2.17584 12.7836 2.47048ZM10.4099 4.15803C6.75344 4.8954 4 8.12619 4 12C4 16.4183 7.58172 20 12 20C14.587 20 16.8886 18.7721 18.3516 16.8648C13.6131 16.0789 10 11.9614 10 7.00001C10 6.01361 10.1431 5.05953 10.4099 4.15803Z" />
+            </svg>
+          </button>
+        </div>
+        <div id="currentUserDisplay" class="current-user-display" aria-label="ログイン中のユーザー: 未取得">
+          <span class="current-user-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="10" r="4" />
+              <path d="M18 20a6 6 0 0 0-12 0" />
+            </svg>
+          </span>
+          <strong id="currentUserName" class="current-user">未取得</strong>
+        </div>
+      </div>
+    </header>
+
+    <div class="app-shell">
+      <aside id="sidebar" class="sidebar">
+        <nav class="sidebar-nav" aria-label="メインメニュー">
+          <ul>
+            <li>
+              <button
+                id="dailyViewButton"
+                class="sidebar-item is-active"
+                type="button"
+                title="日報" aria-label="日報"
+              >
+                <span class="sidebar-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="img">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </span>
+                <span class="sidebar-text">日報</span>
+              </button>
+            </li>
+            <li>
+              <button
+                id="calendarViewButton"
+                class="sidebar-item"
+                type="button"
+                title="カレンダー" aria-label="カレンダー"
+              >
+                <span class="sidebar-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="img">
+                    <path d="M6 2v4M18 2v4M3 9h18" />
+                    <rect x="3" y="4" width="18" height="17" rx="2" />
+                    <path d="M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2M15 17h2" />
+                  </svg>
+                </span>
+                <span class="sidebar-text">カレンダー</span>
+              </button>
+            </li>
+          </ul>
+        </nav>
+        <nav class="sidebar-secondary-nav" aria-label="アプリ設定">
+          <button
+            id="adminViewButton"
+            class="sidebar-item hidden"
+            type="button"
+            title="管理" aria-label="管理"
+          >
+            <span class="sidebar-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" role="img">
+                <ellipse cx="12" cy="5" rx="8" ry="3" />
+                <path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
+                <path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+              </svg>
+            </span>
+            <span class="sidebar-text">管理</span>
+          </button>
+          <button
+            id="openSettingsButton"
+            class="sidebar-item"
+            type="button"
+            title="設定" aria-label="設定"
+          >
+            <span class="sidebar-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" role="img">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </span>
+            <span class="sidebar-text">設定</span>
+          </button>
+        </nav>
+        <div class="sidebar-version" aria-label="バージョン 0.1.0">
+          <span>Version</span>
+          <span>0.1.0</span>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <div id="statusRegion" class="status-region" aria-label="通知">
+          <div id="messageList" class="message-list"></div>
+        </div>
+        <section id="mainPanel" class="content">
+          <div id="reportPanel" class="workspace-card">
+            <div class="report-toolbar">
+              <div class="toolbar-row toolbar-filter-row">
+                <div class="period-main-controls">
+                    <input id="startDate" type="hidden" />
+                    <input id="endDate" type="hidden" />
+                    <div class="period-mode-control">
+                      <div
+                        class="period-presets"
+                        role="radiogroup"
+                        aria-label="表示期間"
+                        dir="ltr"
+                      >
+                        <div class="period-presets-indicator" aria-hidden="true"></div>
+                        <button
+                          id="presetMonthButton"
+                          class="preset-button"
+                          type="button"
+                          role="radio"
+                          aria-label="今月"
+                          data-period-mode="month"
+                          data-state="off"
+                          aria-checked="false"
+                          aria-pressed="false"
+                          tabindex="-1"
+                        >
+                          <span class="relative">今月</span>
+                        </button>
+                        <button
+                          id="presetWeekButton"
+                          class="preset-button"
+                          type="button"
+                          role="radio"
+                          aria-label="今週"
+                          data-period-mode="week"
+                          data-state="off"
+                          aria-checked="false"
+                          aria-pressed="false"
+                          tabindex="-1"
+                        >
+                          <span class="relative">今週</span>
+                        </button>
+                        <button
+                          id="presetDefaultButton"
+                          class="preset-button"
+                          type="button"
+                          role="radio"
+                          aria-label="直近"
+                          data-period-mode="default"
+                          data-state="on"
+                          aria-checked="true"
+                          aria-pressed="true"
+                          tabindex="0"
+                        >
+                          <span class="relative">直近</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="period-navigation" role="group" aria-label="表示期間を移動">
+                      <button id="periodPrevButton" class="period-shift-button" type="button">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+                      </button>
+                      <span id="periodShiftStepLabel" class="period-shift-step-label" aria-hidden="true">1稼働日</span>
+                      <button id="periodNextButton" class="period-shift-button" type="button">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                      </button>
+                    </div>
+                    <span
+                      id="periodDateRange"
+                      class="period-date-range"
+                      aria-label="表示中の日付範囲"
+                      aria-live="polite"
+                      aria-atomic="true"
+                    ></span>
+                    <div class="missing-mode-summary" aria-label="未コメントモード">
+                      <span class="missing-mode-status" aria-live="polite">未コメントのみ表示</span>
+                      <button
+                        id="exitMissingCommentsButton"
+                        class="toolbar-button missing-mode-exit-button"
+                        type="button"
+                      >
+                        <span class="missing-mode-exit-label">通常表示に戻る</span>
+                      </button>
+                    </div>
+                </div>
+                <div class="toolbar-right">
+                  <button
+                    id="refreshButton"
+                    class="toolbar-button data-refresh-button"
+                    type="button"
+                    aria-label="最新データを取得"
+                    disabled
+                  >
+                    <span class="toolbar-button-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M4.5 2.5a1 1 0 0 1 1 1v1.572A9.5 9.5 0 1 1 12 21.5c-4.87 0-8.882-3.663-9.435-8.384a1 1 0 0 1 1.986-.232A7.501 7.501 0 0 0 19.5 12 7.5 7.5 0 0 0 6.41 7H9a1 1 0 0 1 0 2H4.5a1 1 0 0 1-1-1.024V3.5a1 1 0 0 1 1-1Z" clip-rule="evenodd" /></svg>
+                    </span>
+                  </button>
+                  <button
+                    id="saveButton"
+                    class="toolbar-button primary"
+                    type="button"
+                    aria-label="保存"
+                    disabled
+                  >
+                    <span class="toolbar-button-label">保存</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div
+              id="reportLoadError"
+              class="screen-load-error hidden"
+              role="alert"
+              aria-live="assertive"
+            >
+              <p id="reportLoadErrorMessage"></p>
+              <button id="reportLoadRetryButton" class="toolbar-button" type="button">
+                再読み込み
+              </button>
+            </div>
+            <div class="member-switch-bar hidden" id="bossFilterArea">
+              <div
+                id="bossSearchControl"
+                class="member-switch-list"
+                role="group"
+                aria-label="日報の表示対象"
+              >
+                <button
+                  id="showSelfButton"
+                  class="member-switch-button"
+                  type="button"
+                  data-member-scope="self"
+                  aria-label="自分の日報"
+                  aria-pressed="false"
+                >
+                  <span class="relative">自分</span>
+                </button>
+                <button
+                  id="showAllSubordinatesButton"
+                  class="member-switch-button"
+                  type="button"
+                  data-member-scope="all"
+                  aria-label="全員の日報"
+                  aria-pressed="false"
+                >
+                  <span class="relative">全員</span>
+                </button>
+                    <div
+                      id="missingCommentsFilterGroup"
+                      class="missing-filter-group hidden"
+                    >
+                      <button
+                        id="showMissingCommentsButton"
+                        class="member-switch-button missing-filter-button"
+                        type="button"
+                        aria-pressed="false"
+                      >
+                        <span class="missing-filter-label">未コメントのみ</span>
+                        <span class="missing-count-badge is-empty" aria-hidden="true">0日</span>
+                      </button>
+                    </div>
+
+              </div>
+            </div>
+            <div id="tableWrap" class="table-card hidden"></div>
+          </div>
+          <section id="adminPanel" class="admin-panel hidden" aria-label="管理">
+            <header class="admin-header">
+              <nav
+                id="masterNav"
+                class="master-nav"
+                role="tablist"
+                aria-label="管理の種類"
+              ></nav>
+              <div class="admin-header-actions">
+                <button
+                  id="adminReloadButton"
+                  class="toolbar-button data-refresh-button"
+                  type="button"
+                  aria-label="最新データを取得"
+                  title="最新データを取得"
+                >
+                  <span class="toolbar-button-icon" aria-hidden="true">
+                    <svg class="is-refresh-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M4.5 2.5a1 1 0 0 1 1 1v1.572A9.5 9.5 0 1 1 12 21.5c-4.87 0-8.882-3.663-9.435-8.384a1 1 0 0 1 1.986-.232A7.501 7.501 0 0 0 19.5 12 7.5 7.5 0 0 0 6.41 7H9a1 1 0 0 1 0 2H4.5a1 1 0 0 1-1-1.024V3.5a1 1 0 0 1 1-1Z" clip-rule="evenodd" /></svg>
+                  </span>
+                </button>
+                <button
+                  id="adminTeamSaveButton"
+                  class="toolbar-button primary hidden"
+                  type="button"
+                  disabled
+                >
+                  保存
+                  <span class="save-pending-indicator hidden" aria-hidden="true"></span>
+                </button>
+                <button
+                  id="adminCalendarSaveButton"
+                  class="toolbar-button primary hidden"
+                  type="button"
+                  disabled
+                >
+                  保存
+                  <span class="save-pending-indicator hidden" aria-hidden="true"></span>
+                </button>
+              </div>
+            </header>
+
+            <div
+              id="adminLoadError"
+              class="screen-load-error hidden"
+              role="alert"
+              aria-live="assertive"
+            >
+              <p id="adminLoadErrorMessage"></p>
+              <button id="adminLoadRetryButton" class="toolbar-button" type="button">
+                再読み込み
+              </button>
+            </div>
+
+            <div id="adminLoading" class="admin-loading">
+              <span class="admin-loading-mark" aria-hidden="true"></span>
+                      <p>管理を読み込んでいます</p>
+            </div>
+
+            <div
+              id="adminWorkspace"
+              class="admin-workspace hidden"
+              role="tabpanel"
+              aria-labelledby="master-tab-user_master"
+            >
+
+              <section class="master-table-pane" aria-label="登録内容">
+                <div class="master-table-toolbar">
+                  <div class="master-table-heading">
+                    <div>
+                      <p id="adminTableEyebrow" class="master-table-eyebrow">管理</p>
+                      <h3 id="adminTableTitle" hidden>ユーザー</h3>
+                    </div>
+                  </div>
+                  <div class="master-table-tools">
+                    <div id="adminSearchControl" class="master-search" role="search">
+                      <label class="visually-hidden" for="adminSearchInput">全列を検索</label>
+                      <input id="adminSearchInput" type="search" autocomplete="off" placeholder="全列を検索" aria-label="全列を検索" />
+                      <button
+                        id="adminSearchClearButton"
+                        class="master-search-clear"
+                        type="button"
+                        aria-label="検索条件をクリア"
+                        hidden
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="m7 7 10 10M17 7 7 17" />
+                        </svg>
+                      </button>
+                    </div>
+                    <button id="adminAddRowButton" class="admin-add-button" type="button">
+                      <span aria-hidden="true">＋</span>
+                      ユーザーを追加
+                    </button>
+                  </div>
+                </div>
+                <div id="adminTableWrap" class="admin-table-wrap"></div>
+              </section>
+
+            </div>
+            <dialog
+              id="userEditorDialog"
+              class="user-editor-dialog"
+              aria-labelledby="userEditorDialogTitle"
+            >
+              <div class="user-editor-dialog-content">
+                <div id="userEditorDialogForm" class="inspector-form user-editor-dialog-form"></div>
+              </div>
+            </dialog>
+            <dialog
+              id="teamEditorDialog"
+              class="user-editor-dialog team-editor-dialog"
+              aria-labelledby="teamEditorDialogTitle"
+            >
+              <div class="user-editor-dialog-content">
+                <div id="teamEditorDialogForm" class="inspector-form user-editor-dialog-form team-editor-dialog-form"></div>
+              </div>
+            </dialog>
+          </section>
+          <section id="settingsPanel" class="settings-panel hidden" aria-label="設定">
+            <div
+              id="settingsLoadError"
+              class="screen-load-error hidden"
+              role="alert"
+              aria-live="assertive"
+            >
+              <p id="settingsLoadErrorMessage"></p>
+              <button id="settingsLoadRetryButton" class="toolbar-button" type="button">
+                再読み込み
+              </button>
+            </div>
+            <p id="settingsSetupNotice" class="settings-setup-notice hidden" role="status">
+              アプリと同じフォルダの storage.ini に [storage] root_path を設定して、アプリを再起動してください。
+            </p>
+            <div id="settingsCard" class="settings-card">
+              <section id="settingsDisplayPanel" class="settings-section" aria-labelledby="settingsDisplayTitle">
+                <h2 id="settingsDisplayTitle">外観</h2>
+                <div class="settings-section-body">
+                  <div class="settings-field settings-control-field">
+                    <div id="colorPaletteSettingTitle" class="settings-field-label">カラーパレット</div>
+                    <div
+                      id="colorPaletteOptions"
+                      class="color-palette-options"
+                      role="radiogroup"
+                      aria-labelledby="colorPaletteSettingTitle"
+                    >
+                      <label class="color-palette-option">
+                        <input
+                          id="colorPaletteBlueWhite"
+                          type="radio"
+                          name="colorPalette"
+                          value="blue_white"
+                          data-color-palette-option
+                        />
+                        <span class="color-palette-preview is-blue-white" aria-hidden="true">
+                          <span></span><span></span><span></span>
+                        </span>
+                        <span>ブルー1</span>
+                      </label>
+                      <label class="color-palette-option">
+                        <input
+                          id="colorPaletteBlue"
+                          type="radio"
+                          name="colorPalette"
+                          value="blue"
+                          data-color-palette-option
+                          checked
+                        />
+                        <span class="color-palette-preview is-blue" aria-hidden="true">
+                          <span></span><span></span><span></span>
+                        </span>
+                        <span>ブルー2</span>
+                      </label>
+                      <label class="color-palette-option">
+                        <input
+                          id="colorPaletteDefault"
+                          type="radio"
+                          name="colorPalette"
+                          value="default"
+                          data-color-palette-option
+                        />
+                        <span class="color-palette-preview is-default" aria-hidden="true">
+                          <span></span><span></span><span></span>
+                        </span>
+                        <span>グレー</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div class="settings-field settings-control-field">
+                    <div id="appearanceModeSettingTitle" class="settings-field-label">表示モード</div>
+                    <div
+                      id="appearanceModeOptions"
+                      class="appearance-mode-options"
+                      role="radiogroup"
+                      aria-labelledby="appearanceModeSettingTitle"
+                    >
+                      <label class="appearance-mode-option">
+                        <input
+                          id="appearanceModeLight"
+                          type="radio"
+                          name="appearanceMode"
+                          value="light"
+                          data-theme-setting-option
+                          checked
+                        />
+                        <span class="appearance-mode-preview is-light" aria-hidden="true"><span></span></span>
+                        <span>ライト</span>
+                      </label>
+                      <label class="appearance-mode-option">
+                        <input
+                          id="appearanceModeDark"
+                          type="radio"
+                          name="appearanceMode"
+                          value="dark"
+                          data-theme-setting-option
+                        />
+                        <span class="appearance-mode-preview is-dark" aria-hidden="true"><span></span></span>
+                        <span>ダーク</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </section>
+              <section id="settingsFeaturePanel" class="settings-section" aria-labelledby="settingsFeatureTitle">
+                <h2 id="settingsFeatureTitle">機能</h2>
+                <div class="settings-section-body">
+                  <div class="settings-field settings-control-field">
+                    <div class="settings-field-label">「直近」の表示範囲</div>
+                    <div class="default-range-selects">
+                      <span>本日を起点に</span>
+                      <label>
+                        <select id="defaultStartOffsetDays" aria-label="表示範囲の開始日">
+                          <option value="5">5稼働日前</option>
+                          <option value="4">4稼働日前</option>
+                          <option value="3">3稼働日前</option>
+                          <option value="2">2稼働日前</option>
+                          <option value="1">1稼働日前</option>
+                          <option value="0">本日</option>
+                        </select>
+                      </label>
+                      <span>～</span>
+                      <label>
+                        <select id="defaultEndOffsetDays" aria-label="表示範囲の終了日">
+                          <option value="0">本日</option>
+                          <option value="1">1稼働日後</option>
+                          <option value="2">2稼働日後</option>
+                          <option value="3">3稼働日後</option>
+                          <option value="4">4稼働日後</option>
+                          <option value="5">5稼働日後</option>
+                        </select>
+                      </label>
+                      <span>の範囲を表示</span>
+                    </div>
+                  </div>
+                  <div class="settings-field settings-control-field">
+                    <div id="memberFilterSettingTitle" class="settings-field-label">フィルタボタン</div>
+                    <div
+                      id="memberFilterOptions"
+                      class="member-filter-options"
+                      role="group"
+                      aria-labelledby="memberFilterSettingTitle"
+                    >
+                      <label class="member-filter-option">
+                        <input id="memberFilterDepartment" type="checkbox" value="department" data-member-filter-level />
+                        <span>係</span>
+                      </label>
+                      <label class="member-filter-option">
+                        <input id="memberFilterSection" type="checkbox" value="section" data-member-filter-level />
+                        <span>チーム</span>
+                      </label>
+                      <label class="member-filter-option">
+                        <input id="memberFilterMember" type="checkbox" value="member" data-member-filter-level />
+                        <span>個人</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div id="commentFeatureSettings" class="settings-section-body">
+                    <label class="settings-field settings-signature-field">
+                      <span>サインの文字</span>
+                      <input
+                        id="commentSignature"
+                        type="text"
+                        maxlength="100"
+                        autocomplete="off"
+                        placeholder="未設定の場合は上司名を使用"
+                      />
+                    </label>
+                    <div class="settings-field settings-date-field">
+                      <label class="settings-field-label" for="missingCommentStartDate">未コメントの集計開始日</label>
+                      <div class="settings-missing-controls">
+                        <div class="period-field-group flatpickr-date-field">
+                          <input id="missingCommentStartDate" type="date" aria-describedby="missingCommentRangeHelp" aria-label="未コメントの集計開始日" />
+                          <svg class="period-field-display-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="4" y="5" width="16" height="15" rx="2" />
+                            <path d="M8 3v4M16 3v4M4 10h16" />
+                          </svg>
+                        </div>
+                        <p id="missingCommentRangeHelp" class="settings-field-help">未コメント集計は過去1年（当日を含め最大366日）のみです。それ以前の日付は、集計開始日に設定しても集計されません。</p>
+                        <label class="settings-check-option">
+                          <input id="includeTodayInMissingComments" type="checkbox" />
+                          <span class="settings-check-copy">当日分を未コメントに含める</span>
+                        </label>
+                        <label class="settings-check-option">
+                          <input id="includeEmptyReportDaysInMissingComments" type="checkbox" checked />
+                          <span class="settings-check-copy">日報未記入日を未コメントに含める</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+              <div class="settings-section-actions">
+                <button
+                  id="settingsReloadButton"
+                  class="toolbar-button data-refresh-button"
+                  type="button"
+                  aria-label="最新データを取得"
+                  title="最新データを取得"
+                >
+                  <span class="toolbar-button-icon" aria-hidden="true">
+                    <svg class="is-refresh-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M4.5 2.5a1 1 0 0 1 1 1v1.572A9.5 9.5 0 1 1 12 21.5c-4.87 0-8.882-3.663-9.435-8.384a1 1 0 0 1 1.986-.232A7.501 7.501 0 0 0 19.5 12 7.5 7.5 0 0 0 6.41 7H9a1 1 0 0 1 0 2H4.5a1 1 0 0 1-1-1.024V3.5a1 1 0 0 1 1-1Z" clip-rule="evenodd" /></svg>
+                  </span>
+                </button>
+                <button
+                  id="saveSettingsButton"
+                  class="toolbar-button primary"
+                  type="button"
+                >
+                  保存
+                  <span class="save-pending-indicator hidden" aria-hidden="true"></span>
+                </button>
+              </div>
+              <p id="settingsSaveError" class="settings-save-error hidden" role="alert"></p>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog
+      id="actionConfirmDialog"
+      class="confirmation-dialog"
+      aria-labelledby="actionConfirmDialogTitle"
+      aria-describedby="actionConfirmDialogDescription"
+    >
+      <div class="confirmation-dialog-content">
+        <h2 id="actionConfirmDialogTitle">確認</h2>
+        <p id="actionConfirmDialogDescription"></p>
+        <div class="confirmation-dialog-actions">
+          <button id="cancelActionConfirmButton" class="dialog-button" type="button">
+            このまま編集を続ける
+          </button>
+          <button id="confirmActionConfirmButton" class="dialog-button danger" type="button">
+            実行する
+          </button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog
+      id="teamCreateDialog"
+      class="team-create-dialog"
+      aria-labelledby="teamCreateDialogTitle"
+    >
+      <form id="teamCreateForm" class="team-create-dialog-content">
+        <h2 id="teamCreateDialogTitle">係を追加</h2>
+        <input id="teamCreateLevel" data-team-create-level type="hidden" value="department" />
+        <label class="inspector-field">
+          <span class="inspector-field-label"><span id="teamCreateNameLabel">係名</span></span>
+          <input id="teamCreateName" data-team-create-name type="text" required autocomplete="off" />
+          <span id="teamCreateNameError" class="inspector-field-error hidden" role="alert"></span>
+        </label>
+        <div class="user-editor-actions team-create-actions">
+          <button id="cancelTeamCreateButton" class="inspector-cancel-button" type="button">キャンセル</button>
+          <button id="confirmTeamCreateButton" class="inspector-save-button" type="submit">作成</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="vendor/flatpickr.min.js?v=20260830-18"></script>
+    <script src="vendor/l10n/ja.js?v=20260830-18"></script>
+    <script src="vendor/tabulator.min.js?v=20260830-18"></script>
+    <script src="rich-text.js?v=20261017-01"></script>
+    <script src="reports.js?v=20261017-02"></script>
+    <script src="settings.js?v=20260919-02"></script>
+    <script src="vendor/Sortable.min.js?v=20260830-18"></script>
+    <script src="admin.js?v=20260904-02"></script>
+    <script src="app.js?v=20261017-03"></script>
+  </body>
+</html>

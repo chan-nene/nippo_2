@@ -1,0 +1,509 @@
+/* Settings screen. Big sections use a quiet divider; controls keep their
+   existing field treatment. */
+
+html body .settings-panel {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  background: var(--surface);
+  padding: 28px 34px 40px;
+}
+
+html body #settingsPanel {
+  --field-fg: var(--text);
+  --form-option-fg: var(--text);
+}
+
+html body .settings-card {
+  max-width: none;
+  background: var(--surface);
+}
+
+html body .settings-header {
+  display: none;
+}
+
+html body .settings-section {
+  display: block;
+  min-width: 0;
+  max-width: 880px;
+  margin: 0;
+  padding: 0 0 30px;
+  border-bottom: 1px solid var(--border);
+}
+
+html body .settings-section + .settings-section {
+  padding-top: 30px;
+}
+
+html body .settings-section:last-of-type {
+  border-bottom: 0;
+}
+
+html body .settings-section > h2 {
+  margin: 0 0 18px;
+  color: var(--text);
+  font-size: var(--font-16);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+html body .settings-section-body {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+}
+
+html body .settings-section,
+html body #settingsPanel .settings-card > .actions {
+  max-width: 646px;
+}
+
+html body .settings-signature-field {
+  max-width: 646px;
+}
+
+html body .settings-field {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  margin: 0;
+  color: var(--text);
+}
+
+html body .settings-field > :is(span:first-child, .settings-field-label) {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-weight: 600;
+}
+
+html body .settings-field-control,
+html body .settings-field > :is(input, select, textarea, .member-filter-options,
+    .color-palette-options, .appearance-mode-options, .default-range-selects,
+    .settings-missing-controls) {
+  min-width: 0;
+}
+
+html body .settings-primary-field > label {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-weight: 600;
+}
+
+html body .settings-primary-control {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 510px);
+  align-items: center;
+}
+
+html body .settings-section-actions {
+  display: flex;
+  min-width: 0;
+  max-width: 646px;
+  margin-top: 2px;
+  padding-top: 4px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+html body #settingsPanel .settings-primary-field > .field-error {
+  grid-column: 1;
+}
+
+html body .settings-card input[type="text"],
+html body .settings-card input[type="date"] {
+  width: 100%;
+  min-height: var(--control-height);
+  height: var(--control-height);
+  margin: 0;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-control);
+  background: var(--input-bg);
+  color: var(--field-fg);
+  padding: 2px var(--field-padding-x) 0;
+  box-shadow: none;
+  line-height: 1.2;
+}
+
+html body .settings-card input:hover {
+  border-color: var(--field-hover-border);
+}
+
+html body .settings-card input:focus {
+  border-color: var(--field-focus-border);
+  box-shadow: none;
+}
+
+html body .settings-card input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+html body #settingsPanel .field-error {
+  color: var(--error);
+  font-size: var(--font-12);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+html body #settingsPanel .settings-save-error {
+  margin: 0 0 8px;
+  color: var(--error);
+  font-size: var(--font-12);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+html body #settingsPanel .settings-field > .field-error {
+  grid-column: 1;
+}
+
+html body :is(input, textarea)[aria-invalid="true"] {
+  border-color: var(--error) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--error) 18%, transparent) !important;
+}
+
+html body .member-filter-options {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+html body .settings-card .member-filter-option {
+  display: inline-flex;
+  min-width: 84px;
+  min-height: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  border: 1px solid var(--form-option-border);
+  border-radius: var(--radius-control);
+  background: var(--form-option-bg);
+  padding: 0 14px;
+  color: var(--form-option-fg);
+  cursor: pointer;
+  font-size: var(--ui-font-size);
+  font-weight: 600;
+}
+
+html body .settings-card .member-filter-option:hover,
+html body .settings-card .member-filter-option:has(input:checked) {
+  border-color: var(--form-option-hover-border);
+  background: var(--form-option-hover-bg);
+}
+
+html body .settings-card .member-filter-option:has(input:checked) {
+  border-color: var(--form-option-selected-border);
+}
+
+html body .settings-card .member-filter-option:has(input:disabled) {
+  border-color: var(--control-disabled-border);
+  background: var(--control-disabled-bg);
+  color: var(--control-disabled-fg);
+  cursor: not-allowed;
+}
+
+html body .member-filter-option input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+html body .member-filter-option:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+html body .color-palette-options {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(150px, 210px));
+  gap: 8px;
+  overflow-x: auto;
+}
+
+html body .appearance-mode-options {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(150px, 210px));
+  gap: 8px;
+}
+
+html body .settings-card :is(.color-palette-option, .appearance-mode-option) {
+  display: grid;
+  min-height: 58px;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  border: 1px solid var(--choice-card-border);
+  border-radius: var(--radius-control);
+  background: var(--choice-card-bg);
+  padding: 9px 12px;
+  color: var(--choice-card-fg);
+  cursor: pointer;
+  font-size: var(--ui-font-size);
+  font-weight: 600;
+}
+
+html body .settings-card :is(.color-palette-option, .appearance-mode-option):hover {
+  border-color: var(--choice-card-hover-border);
+  background: var(--choice-card-hover-bg);
+}
+
+html body .settings-card :is(.color-palette-option, .appearance-mode-option):has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+html body :is(.color-palette-option, .appearance-mode-option) input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+html body :is(.color-palette-option, .appearance-mode-option):has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+html body .color-palette-preview {
+  display: grid;
+  width: 36px;
+  height: 28px;
+  grid-template-columns: repeat(3, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+html body .color-palette-preview.is-default > span {
+  background: #9b9b9b;
+}
+
+html[data-theme="dark"] body .color-palette-preview.is-default > span {
+  background: #686868;
+}
+
+html body .color-palette-preview.is-blue > span {
+  background: #006399;
+}
+
+html[data-theme="dark"] body .color-palette-preview.is-blue > span {
+  background: #2893cc;
+}
+
+html body .color-palette-preview.is-blue-white > span {
+  background: #2563EB;
+}
+
+html[data-theme="dark"] body .color-palette-preview.is-blue-white > span {
+  background: #60a5fa;
+}
+
+html body .appearance-mode-preview {
+  position: relative;
+  display: block;
+  width: 36px;
+  height: 28px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+html body .appearance-mode-preview > span {
+  position: absolute;
+  inset: 6px 5px 4px 11px;
+  border-radius: 3px;
+}
+
+html body .appearance-mode-preview.is-light {
+  background: #f7f7f8;
+}
+
+html body .appearance-mode-preview.is-light > span {
+  background: #ffffff;
+  box-shadow: -6px 0 0 #e4e4e6;
+}
+
+html body .appearance-mode-preview.is-dark {
+  border-color: rgb(255 255 255 / 20%);
+  background: #131313;
+}
+
+html body .appearance-mode-preview.is-dark > span {
+  background: #282828;
+  box-shadow: -6px 0 0 #0d0d0d;
+}
+
+@media (max-width: 760px) {
+  html body .appearance-mode-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+html body .default-range-selects {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: var(--font-13);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+html body .default-range-selects label {
+  display: block;
+  margin: 0;
+}
+
+html body .default-range-selects select {
+  min-width: 76px;
+  min-height: var(--control-height);
+  height: var(--control-height);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-control);
+  background: var(--field-bg);
+  color: var(--text);
+  padding: 2px 8px 0;
+  font-size: var(--ui-font-size);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+html body .default-range-selects select:hover {
+  border-color: var(--field-hover-border);
+}
+
+html body .default-range-selects select:focus {
+  border-color: var(--field-focus-border);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+html body .settings-missing-controls {
+  display: grid;
+  min-width: 0;
+  justify-items: start;
+  gap: 10px;
+}
+
+html body #settingsPanel .period-field-group {
+  position: relative;
+  display: flex;
+  min-height: var(--control-height);
+  height: var(--control-height);
+  align-items: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-border);
+  transition: box-shadow 0.14s ease;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html body #settingsPanel .period-field-group:hover,
+html body #settingsPanel .period-field-group:active {
+  box-shadow: inset 0 0 0 1px var(--field-hover-border);
+}
+
+html body #settingsPanel .period-field-group:focus-within {
+  box-shadow: inset 0 0 0 1px var(--field-focus-border);
+}
+
+html body #settingsPanel .period-field-group:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+html body .settings-card .settings-check-option {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  color: var(--text);
+  cursor: pointer;
+}
+
+html body .settings-check-option input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+html body .settings-check-copy {
+  min-width: 0;
+  color: var(--text);
+  font-size: var(--font-13);
+  font-weight: 600;
+}
+
+html body #settingsPanel .settings-card > .actions {
+  margin-top: -2px;
+  padding-left: 160px;
+  text-align: right;
+}
+
+html body #settingsPanel #saveSettingsButton {
+  padding-top: 2px;
+  padding-bottom: 0;
+}
+
+@media (max-width: 860px) {
+  html body .settings-section {
+    padding-bottom: 26px;
+  }
+
+  html body .settings-section + .settings-section {
+    padding-top: 26px;
+  }
+
+  html body #settingsPanel .settings-card > .actions {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  html body .settings-panel {
+    padding: 20px 16px 28px;
+  }
+
+  html body .settings-field {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  html body #settingsPanel .settings-field > .field-error {
+    grid-column: 1;
+  }
+}
+
+html body .settings-field-help {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-12);
+  line-height: 1.5;
+}

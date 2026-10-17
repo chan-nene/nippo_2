@@ -1,0 +1,2209 @@
+/* Hallmark · genre: modern-minimal · tone: utilitarian · macrostructure: Workbench · signature: rowspan member column · anchor hue: ink blue · pre-emit critique: P5 H5 E5 S5 R5 V4 · contrast: pass (40–41) · responsive: pass */
+
+/* Command bar */
+
+html body #reportPanel {
+  --weekday-sat: #2563eb;
+  --weekday-sun: var(--danger-icon);
+  --report-regular-row-height: 58px;
+  --report-period-bg: #ededed;
+  --report-period-indicator: #ffffff;
+  --report-period-fg: var(--interactive-fill);
+  --report-period-muted: #5d5d5d;
+  --report-period-hover: #cdcdcd;
+  --report-period-shadow: 0 1px 4px -1px rgb(0 0 0 / .2);
+  --report-today-bg: oklab(0.683029 -0.16619 0.102668 / 0.15);
+  --report-today-fg: #008635;
+}
+
+html body[data-font-size="compact"] #reportPanel {
+  --report-regular-row-height: 53px;
+}
+
+html body[data-font-size="medium"] #reportPanel {
+  --report-regular-row-height: 61px;
+}
+
+html body[data-font-size="large"] #reportPanel {
+  --report-regular-row-height: 64px;
+}
+
+html body[data-font-size="xlarge"] #reportPanel {
+  --report-regular-row-height: 67px;
+}
+
+html:not([data-theme="dark"]) body #reportPanel {
+  --holiday-row-bg: #f4f4f5;
+  --holiday-row-hover-bg: #e9e9eb;
+}
+
+html[data-theme="dark"] body #reportPanel {
+  --weekday-sat: #60a5fa;
+  --holiday-row-bg: color-mix(in srgb, var(--table-cell-bg) 93%, white);
+  --holiday-row-hover-bg: color-mix(in srgb, var(--table-cell-bg) 95%, white);
+  --report-period-bg: #0d0d0d;
+  --report-period-indicator: #303030;
+  --report-period-fg: var(--text-strong);
+  --report-period-muted: #afafaf;
+  --report-period-hover: #303030;
+  --report-today-fg: #04b84c;
+}
+
+html[data-color-palette="blue"] body #reportPanel {
+  --report-today-bg: #dbeafe;
+  --report-today-fg: #1e40af;
+}
+
+html[data-color-palette="blue"][data-theme="dark"] body #reportPanel {
+  --report-today-bg: rgb(59 130 246 / 15%);
+  --report-today-fg: #60a5fa;
+}
+
+html[data-color-palette="blue_white"][data-theme="light"] body #reportPanel {
+  --report-period-bg: #f8fafc;
+  --report-period-indicator: #ffffff;
+  --report-period-fg: #0f172a;
+  --report-period-muted: #334155;
+  --report-period-hover: #eff6ff;
+  --report-period-shadow: 0 1px 4px -1px rgb(15 23 42 / 20%);
+  --holiday-row-bg: #f4f4f5;
+  --holiday-row-hover-bg: #e9e9eb;
+  --report-today-bg: #dbeafe;
+  --report-today-fg: #1d4ed8;
+}
+
+/* White surfaces make the report header read best in the same near-black
+   tone as the rest of the primary hierarchy. */
+html[data-color-palette="blue_white"][data-theme="light"] body #tableWrap table th {
+  color: var(--text-strong);
+}
+
+/* The blue_white dark surface keeps report holidays quiet while calendar
+   holidays retain their blue meaning in the administration screen. */
+html[data-color-palette="blue_white"][data-theme="dark"] body #reportPanel {
+  --report-period-bg: #0b0b0b;
+  --report-period-indicator: #181818;
+  --report-period-fg: #f8fafc;
+  --report-period-muted: #94a3b8;
+  --report-period-hover: #1b1b1b;
+  --report-period-shadow: 0 1px 4px -1px rgb(0 0 0 / 45%);
+  --holiday-row-bg: color-mix(in srgb, var(--table-cell-bg) 93%, white);
+  --holiday-row-hover-bg: color-mix(in srgb, var(--table-cell-bg) 95%, white);
+  --report-today-bg: rgb(96 165 250 / 18%);
+  --report-today-fg: #bfdbfe;
+}
+
+html[data-color-palette="blue_white"][data-theme="dark"] body #tableWrap table th {
+  color: var(--text-strong);
+}
+
+html body {
+  --report-empty-icon: #9b9b9b;
+}
+
+html[data-theme="dark"] body {
+  --report-empty-icon: #b9b9b9;
+}
+
+html body .report-toolbar {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  flex-direction: column;
+  border-bottom: 0;
+  background: transparent;
+}
+
+html body .toolbar-row {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+}
+
+html body .toolbar-filter-row {
+  min-height: 60px;
+  padding: 8px 14px 14px;
+  border-top: 0;
+  background: transparent;
+}
+
+html body .toolbar-left,
+html body .toolbar-left-wide {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--control-group-gap);
+  flex-wrap: nowrap;
+  position: relative;
+}
+
+html body .toolbar-right {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--control-group-gap);
+  flex-wrap: nowrap;
+  position: relative;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+html body .toolbar-filter-row .toolbar-left-wide {
+  width: auto;
+  flex: 0 1 auto;
+  gap: var(--control-group-gap);
+  flex-wrap: wrap;
+}
+
+html body .toolbar-button {
+  display: inline-flex;
+  position: relative;
+  min-height: var(--control-height);
+  height: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  gap: var(--control-icon-gap);
+  padding: 0 var(--control-padding-x);
+  white-space: nowrap;
+  font-size: var(--font-13);
+  font-weight: 600;
+  border: 1px solid var(--action-secondary-border);
+  border-radius: var(--radius-control);
+  background: var(--action-secondary-bg);
+  color: var(--action-secondary-fg);
+  box-shadow: none;
+}
+
+html body .toolbar-button:hover {
+  border-color: var(--action-secondary-hover-border);
+  background: var(--action-secondary-hover-bg);
+  color: var(--action-secondary-hover-fg);
+}
+
+html body .toolbar-button.primary {
+  border-color: var(--action-primary-border);
+  background: var(--action-primary-bg);
+  color: var(--action-primary-fg);
+}
+
+html body .toolbar-button.primary:hover {
+  border-color: var(--action-primary-hover-border);
+  background: var(--action-primary-hover-bg);
+  color: var(--action-primary-fg);
+}
+
+html body .toolbar-button:disabled,
+html body .toolbar-button.primary:disabled {
+  border-color: var(--control-disabled-border);
+  background: var(--control-disabled-bg);
+  color: var(--control-disabled-fg);
+}
+
+html body .toolbar-button-icon {
+  display: inline-flex;
+  width: 14px;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+html body .period-control {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+html body .period-main-controls,
+html body .period-mode-control {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+html body .period-navigation {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0;
+  height: var(--control-height);
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control-track-bg);
+  padding: 4px;
+}
+
+html body .period-shift-button {
+  display: inline-flex;
+  width: calc(var(--control-height) - 4px);
+  min-width: calc(var(--control-height) - 4px);
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 calc(var(--control-height) - 4px);
+  gap: 0;
+  border: 0;
+  white-space: nowrap;
+}
+
+html body .period-shift-step-label {
+  display: inline-flex;
+  min-width: 60px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0 8px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+html body .period-main-controls {
+  width: auto;
+  gap: 14px;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+html body .period-shift-button svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+html body .missing-filter-group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+  flex: 0 0 auto;
+  margin-left: 28px;
+  margin-right: 8px;
+}
+
+html body #reportPanel .missing-mode-summary {
+  display: none;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+html body #reportPanel.is-missing-mode .missing-mode-summary {
+  display: flex;
+}
+
+html body #reportPanel.is-missing-mode :is(
+    .period-mode-control,
+    .period-navigation,
+    .missing-filter-group
+  ) {
+  display: none !important;
+}
+
+/* 自分自身にはコメントしないため、未コメント表示では自分ボタンを隠す。 */
+html body #reportPanel.is-missing-mode #showSelfButton {
+  display: none !important;
+}
+
+html body #reportPanel .missing-mode-status {
+  color: var(--text-muted);
+  font-size: var(--ui-font-size);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+html body #reportPanel .missing-mode-target {
+  color: var(--text-muted);
+  font-size: var(--font-13);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+html body #reportPanel .missing-mode-exit-button {
+  flex: 0 0 auto;
+  background: var(--filter-idle-bg);
+  border-color: var(--border);
+  color: var(--filter-idle-fg);
+}
+
+html body #reportPanel .missing-mode-exit-button:hover:not(:disabled) {
+  background: var(--filter-idle-hover-bg);
+  border-color: var(--border-strong);
+  color: var(--filter-idle-hover-fg);
+}
+
+html body #reportPanel .missing-mode-exit-label {
+  transform: translateY(1px);
+}
+
+html body .period-filter-divider {
+  width: 1px;
+  height: 24px;
+  flex: 0 0 auto;
+  background: var(--border-strong);
+}
+
+html body .period-control-container {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  flex-direction: column;
+}
+
+html body .period-control input[type="date"] {
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--field-fg);
+  padding: 0 var(--field-padding-x);
+  font-size: var(--ui-font-size);
+  line-height: 1.2;
+  text-align: center;
+  -webkit-user-select: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+html body .missing-filter-label {
+  white-space: nowrap;
+}
+
+html body .missing-count-badge {
+  position: absolute;
+  top: -8px;
+  right: -9px;
+  display: inline-flex;
+  box-sizing: border-box;
+  min-width: 34px;
+  height: var(--badge-height);
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  background: var(--missing-badge-pending-bg);
+  color: var(--missing-badge-text);
+  padding: 0 6px;
+  box-shadow: 0 1px 3px var(--shadow-color-strong);
+  font-size: var(--font-10);
+  font-weight: 800;
+  line-height: 1;
+
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+html body .missing-count-badge.is-overdue {
+  background: var(--missing-badge-overdue-bg);
+}
+
+html body .missing-count-badge.is-empty {
+  background: var(--missing-badge-clear-bg);
+}
+
+html body .missing-count-badge.is-loading {
+  background: var(--missing-badge-loading-bg);
+}
+
+html body .member-switch-list > #showSelfButton {
+  margin-right: 10px;
+}
+
+html body #missingCommentsFilterGroup .period-filter-divider {
+  display: none;
+}
+
+html body #missingCommentsFilterGroup #showMissingCommentsButton {
+  margin-left: 0;
+}
+
+/* Table */
+
+html body table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--text);
+  table-layout: fixed;
+}
+
+html body th,
+html body td {
+  border-right: 1px solid var(--table-border);
+  border-bottom: 0;
+  text-align: left;
+  position: relative;
+  height: var(--table-row-height);
+  min-height: var(--table-row-height);
+  padding: 0;
+  background: var(--table-cell-bg);
+  color: var(--text);
+  font-size: 14px;
+  vertical-align: top;
+}
+
+/* セル内の強調枠や操作ボタンを固定ヘッダー・固定列より下に収める。 */
+html body #reportPanel tbody td:not(.date-col):not(.user-col) {
+  isolation: isolate;
+}
+
+html body thead th:first-child {
+  border-left: 1px solid var(--table-border);
+  border-top-left-radius: var(--radius-sm);
+}
+
+html body tbody th.user-col {
+  border-left: 1px solid var(--table-border);
+  position: sticky;
+  z-index: 4;
+  top: auto;
+  height: auto;
+  padding: 0;
+  border-top: 0;
+  background: var(--table-cell-bg);
+  color: var(--text);
+  font-size: var(--font-14);
+  vertical-align: top;
+  white-space: normal;
+}
+
+html body th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  height: var(--table-header-height);
+  padding: 0 var(--cell-padding-x);
+  border-top: 1px solid var(--table-border);
+  border-bottom-color: var(--table-border);
+  background: var(--table-header-bg);
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 700;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+html body thead th:last-child {
+  border-top-right-radius: var(--radius-sm);
+}
+
+html body .user-content {
+  position: sticky;
+  top: calc(var(--table-header-height) + 1px);
+  display: flex;
+  min-height: var(--table-row-height);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: var(--cell-padding-y) var(--cell-padding-x);
+  line-height: 1.35;
+}
+
+html body .user-content strong {
+  min-width: 0;
+  color: var(--text-strong);
+  font-size: var(--font-14);
+  overflow-wrap: anywhere;
+}
+
+html body .user-content small {
+  color: var(--text-muted);
+  font-size: var(--font-12);
+  font-weight: 500;
+}
+
+html body :is(th, td).date-col {
+  position: sticky;
+  left: var(--sticky-date-left, 144px);
+  z-index: 4;
+  background: var(--table-cell-bg);
+  border-right: 1px solid var(--table-border);
+}
+
+html body th.date-col {
+  z-index: 7;
+  background: var(--table-header-bg);
+}
+
+html body :is(th, td).user-col {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--table-cell-bg);
+}
+
+html body thead th.user-col {
+  z-index: 8;
+  background: var(--table-header-bg);
+}
+
+html body .date-col {
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+html body thead th,
+html body thead th.date-col {
+  text-align: left;
+}
+
+html body thead th.date-col,
+html body .cell-frame.date-content {
+  padding-right: var(--date-cell-padding-x);
+  padding-left: var(--date-cell-padding-x);
+}
+
+html body .user-col {
+  min-width: 0;
+}
+
+html body .name-col {
+  min-width: 0;
+}
+
+html body .detail-col {
+  min-width: 0;
+}
+
+html body .comment-col {
+  min-width: 0;
+}
+
+html body .column-header-label {
+  pointer-events: none;
+}
+
+html body .column-header-content {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+html body #reportPanel table thead th.self-comment-col,
+html body #reportPanel table tbody tr.is-today > td.date-col {
+  background: linear-gradient(var(--report-today-bg), var(--report-today-bg)), var(--table-header-bg);
+  color: var(--report-today-fg);
+}
+
+html body #reportPanel table tbody tr.is-today > td.date-col .date-content {
+  color: inherit;
+}
+
+html body #reportPanel tr.is-today .date-value span {
+  color: inherit;
+}
+
+html body #reportPanel .date-value .date-weekday .date-weekday-sat {
+  color: var(--weekday-sat);
+}
+
+html body #reportPanel .date-value .date-weekday .date-weekday-sun {
+  color: var(--weekday-sun);
+}
+
+html body #reportPanel table thead th .column-header-you {
+  display: inline-flex;
+  width: max-content;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  align-items: center;
+  align-self: center;
+  justify-content: center;
+  padding: 2px 6px 1px;
+  border-radius: 4px;
+
+  font-family: var(--font-ui);
+  font-size: calc(var(--ui-font-size) - 2px);
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+html body .column-resize-handle {
+  position: absolute;
+  z-index: 12;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+/* 右端の操作領域を表内に収め、画面幅に合わせた際の横スクロールを防ぐ。 */
+html body #tableWrap thead th:last-child .column-resize-handle {
+  right: 0;
+}
+
+html body .column-resize-handle::before {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 2px;
+  width: 2px;
+  border-radius: 2px;
+  background: transparent;
+  content: "";
+}
+
+html body .column-resize-handle:hover::before,
+html body .column-resize-handle:focus-visible::before,
+html body .column-resize-handle.is-active::before {
+  background: var(--text-muted);
+}
+
+html body .column-resize-guide {
+  position: fixed;
+  z-index: 100;
+  top: 0;
+  display: none;
+  width: 2px;
+  background: var(--text-muted);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-muted) 18%, transparent);
+  pointer-events: none;
+}
+
+html body .column-resize-guide.is-visible {
+  display: block;
+}
+
+html body.is-resizing-column,
+html body.is-resizing-column * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+html body .cell-frame,
+html body .editable-content {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: calc(var(--table-row-height) - 1px);
+  padding: var(--cell-padding-y) var(--cell-padding-x);
+  color: var(--text);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  cursor: default;
+  background: transparent;
+}
+
+html body .date-content {
+  white-space: nowrap;
+  text-align: center;
+}
+
+html body .date-primary {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  line-height: 1.35;
+}
+
+html body .date-value {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+}
+
+html body .date-weekday,
+html body .cell-sub-label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+html body .date-weekday-sat {
+  color: var(--weekday-sat);
+}
+
+html body .date-weekday-sun {
+  color: var(--weekday-sun);
+}
+
+html body #reportPanel tr.holiday:not(.is-today) > td.date-col {
+  background: var(--holiday-row-bg);
+}
+
+/* Keep one-line rows compact; wrapped text and replies grow naturally. */
+html body #reportPanel tbody tr {
+  --table-row-height: max(30px, var(--compact-control-height));
+}
+
+html body #reportPanel td.comment-not-applicable {
+  background: var(--holiday-row-bg);
+  color: var(--text-muted);
+  cursor: default;
+  font-weight: 400;
+  text-align: center;
+}
+
+html body .editable-content.is-editable {
+  cursor: text;
+}
+
+html body .editable-content.is-editable:hover {
+  background: transparent;
+  box-shadow: none;
+}
+
+html body td:hover:not(:has(.is-editing)):has(.editable-content.is-editable:not(.reply-content)) {
+  background: var(--editable-cell-hover);
+}
+
+html body td:hover:not(:has(.is-editing)):has(.editable-content.is-editable:not(.reply-content))::after {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  border-radius: 1px;
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--primary) 42%, transparent);
+  content: "";
+  pointer-events: none;
+}
+
+html body .editable-content.is-empty {
+  color: transparent;
+}
+
+html body .editable-content.is-empty .editable-empty-icon {
+  display: inline-flex;
+  width: 17px;
+  height: 17px;
+  align-items: center;
+  justify-content: center;
+  color: var(--report-empty-icon);
+  opacity: 0;
+  vertical-align: middle;
+}
+
+html body .editable-empty-icon svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+
+html body td:hover .editable-content.is-empty .editable-empty-icon,
+html body .editable-content.is-empty:focus-visible .editable-empty-icon {
+  opacity: 0.72;
+}
+
+/* Report cells expose the same edit affordance before and after entering text. */
+html body #reportPanel td:is(.name-col, .detail-col) .editable-content .editable-empty-icon {
+  display: none;
+}
+
+html body td:is(.name-col, .detail-col):is(:hover, :focus-within):has(> .editable-content.is-editable:not(.is-editing))::before {
+  content: "";
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  width: 17px;
+  height: 17px;
+  z-index: 2;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--text-muted) 60%, transparent);
+  mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20fill%3D%22black%22%20fill-rule%3D%22evenodd%22%20d%3D%22M16.793%202.793a3.121%203.121%200%201%201%204.414%204.414l-8.5%208.5A1%201%200%200%201%2012%2016H9a1%201%200%200%201-1-1v-3a1%201%200%200%201%20.293-.707l8.5-8.5Zm3%201.414a1.121%201.121%200%200%200-1.586%200L10%2012.414V14h1.586l8.207-8.207a1.121%201.121%200%200%200%200-1.586ZM6%205a1%201%200%200%201-1%201v12a1%201%200%200%200%201%201h12a1%201%200%200%201-1-1v-4a1%201%200%201%201%202%200v4a3%203%200%200%201-3%203H6a3%203%200%200%201-3-3V6a3%203%200%200%201%203-3h4a1%201%200%201%201%200%202H6Z%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;
+}
+
+html body .editable-content.is-editing,
+html body .editable-content.is-editing:hover {
+  position: relative;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body td:has(.editable-content.is-editing:not(.reply-content))::after {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  box-shadow: inset 0 0 0 2px var(--primary);
+  content: "";
+  pointer-events: none;
+}
+
+html body .editing-textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: calc(var(--table-row-height) - 1px);
+  margin: 0;
+  resize: none;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--text);
+  padding: var(--cell-padding-y) var(--cell-padding-x);
+  font-weight: inherit;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  outline: none;
+}
+
+html body .editing-textarea:focus,
+html body .editing-textarea:focus-visible {
+  outline: none;
+  outline-width: 0;
+  outline-offset: 0;
+}
+
+html body #reportPanel td:has(.is-editing:not(.reply-content)):not(.is-dirty-cell) {
+  background: var(--surface);
+}
+
+html body #reportPanel td:has(.is-editing) .editing-textarea {
+  background: transparent;
+}
+
+html body td.is-dirty-cell,
+html body .editable-content.is-dirty,
+html body .editable-content.is-dirty.is-editing .editing-textarea {
+  background: var(--dirty);
+}
+
+html body td.is-dirty-cell .editable-content,
+html body td.is-dirty-cell .editing-textarea {
+  background: transparent;
+}
+
+html body tr.holiday td.is-dirty-cell:not(.date-col) {
+  background: var(--dirty);
+}
+
+html body .comment-stack {
+  position: static;
+  display: grid;
+  min-width: 0;
+  max-width: 100%;
+  gap: 5px;
+  min-height: calc(var(--table-row-height) - 1px);
+}
+
+html body .boss-comment-actions {
+  position: absolute;
+  width: auto;
+  min-height: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0 6px 2px;
+}
+
+html body td:hover .boss-comment-actions,
+html body .boss-comment-actions:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+html body .boss-comment-link {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  height: 22px;
+  min-height: 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: color-mix(in srgb, var(--text-muted) 65%, transparent);
+  padding: 2px 8px;
+}
+
+html body .boss-comment-action-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+html body .boss-comment-link:hover,
+html body .boss-comment-link:focus-visible {
+  border-color: var(--primary-border);
+  background: transparent;
+  color: var(--action-secondary-hover-fg);
+}
+
+html body .reply-toggle-button {
+  display: inline-flex;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  color: color-mix(in srgb, var(--text-muted) 65%, transparent);
+  padding: 0;
+}
+
+html body .reply-toggle-button:hover,
+html body .reply-toggle-button:focus-visible {
+  border-color: var(--primary-border);
+  background: var(--surface-hover);
+  color: var(--action-secondary-hover-fg);
+}
+
+html body .reply-section {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+}
+
+html body .reply-section.is-collapsed {
+  position: absolute;
+  z-index: 11;
+  bottom: 6px;
+  right: 8px;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 細い列で本文が増えても、下端の返信ボタンと重ならない領域を確保する。 */
+html body .comment-stack:has(> .reply-section.is-collapsed) {
+  padding-bottom: 34px;
+}
+
+html body td:hover .reply-section.is-collapsed,
+html body .comment-stack:focus-within > .reply-section.is-collapsed {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+html body .reply-section.is-expanded {
+  padding: 0 8px 7px;
+}
+
+html body .reply-card {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--control-height-compact);
+  align-items: flex-start;
+  gap: 5px;
+  margin: 0;
+  border: 1px solid var(--self-label-border);
+  border-radius: var(--radius-sm);
+  background: var(--self-label-bg);
+  color: var(--self-label-fg);
+  padding: 8px;
+}
+
+html body .reply-card-content {
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 auto;
+}
+
+html body .reply-card .reply-content {
+  min-height: 1.35em;
+  padding: 0;
+  color: inherit;
+  font-size: var(--font-13);
+  font-weight: normal;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+html body #reportPanel .reply-card .reply-content,
+html body #reportPanel .reply-card .reply-content .editing-textarea {
+  background: transparent;
+}
+
+html body .reply-card .editing-textarea {
+  min-height: 1.35em;
+  padding: 0;
+  border-radius: 0;
+  font: inherit;
+}
+
+html body .reply-card:has(.reply-content.is-editable):not(:has(.is-editing)):hover {
+  background: color-mix(in srgb, var(--self-label-bg) 82%, var(--self-label-fg));
+  box-shadow: inset 0 0 0 1px var(--self-label-border);
+}
+
+html body .reply-card:has(.reply-content.is-editing) {
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+html body #reportPanel .reply-card:has(.reply-content.is-dirty) {
+  background: var(--dirty);
+}
+
+html body .empty {
+  display: flex;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Only the table scrolls; filters and navigation stay fixed to the viewport. */
+
+html body .table-content {
+  min-width: 0;
+}
+
+html body .table-content table {
+  width: 100%;
+}
+
+/* SVG icon system */
+
+/* Limited rich text keeps the same cell and card geometry as plain text. */
+html body .editable-content p {
+  margin: 0;
+  padding: 0;
+  min-height: 1.35em;
+  line-height: inherit;
+}
+html body .rich-text-editor {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: var(--cell-padding-y) var(--cell-padding-x);
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
+  cursor: text;
+}
+html body .reply-card .rich-text-editor { padding: 0; min-height: 1.35em; }
+html body .editable-content strong { font-weight: 700; }
+html body .editable-content u { text-decoration: underline; text-underline-offset: 2px; }
+html body .rich-text-menu {
+  position: fixed;
+  z-index: 300;
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 3px 12px #0003;
+}
+html body .rich-text-menu[hidden] { display: none; }
+html body .rich-text-menu button {
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+html body .rich-text-menu button:hover,
+html body .rich-text-menu button[aria-pressed="true"] {
+  background: var(--self-label-bg);
+  color: var(--self-label-fg);
+  border-color: var(--self-label-border);
+}
+
+html body .toolbar-button-icon svg,
+html body .reply-toggle-icon {
+  display: block;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+html body .toolbar-button-icon svg.is-spinning {
+  animation: icon-spin 0.8s linear infinite;
+}
+
+/* Responsive layout is consolidated at the end of this stylesheet. */
+
+/* Daily report table typography follows the common-master table. */
+html body #tableWrap table th,
+html body #tableWrap table td {
+  font-weight: normal;
+}
+
+html body #tableWrap table th {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+html body #tableWrap table th :is(.column-header-label, .column-header-content, .column-header-you, .column-resize-handle) {
+  color: inherit;
+  font-weight: 700;
+}
+
+html body #tableWrap table td,
+html body #tableWrap table td :is(.user-content, .editable-content, .comment-stack, .reply-card-content) {
+  font-weight: 400;
+}
+
+/* Report control and table geometry. */
+html body #reportPanel .toolbar-filter-row {
+  min-height: 58px;
+  padding: 12px 18px 10px;
+}
+
+html body #reportPanel .period-field-group {
+  min-height: var(--control-height);
+  height: var(--control-height);
+  border-color: transparent;
+  border-radius: var(--radius-control);
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-border);
+  transition: box-shadow 0.14s ease;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html body #reportPanel .period-field-group:hover,
+html body #reportPanel .period-field-group:active {
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px var(--field-hover-border);
+}
+
+html body #reportPanel .period-field-group:focus-within {
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px var(--field-focus-border);
+}
+
+html body #reportPanel .period-field-group:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+html body #reportPanel .period-field-group.is-pointer-focused:has(input:focus-visible) {
+  outline: none;
+}
+
+html body #reportPanel .period-field-group input:focus-visible {
+  outline: none;
+}
+
+html body #reportPanel .toolbar-button:not(.primary):hover,
+html body #reportPanel .period-shift-button:hover,
+html body #reportPanel .preset-button:hover,
+html body #reportPanel .member-switch-button:hover {
+  border-color: var(--border-strong);
+  color: var(--text-strong);
+}
+
+/* Member type filter-style period control. */
+html body #reportPanel .period-presets {
+  box-sizing: border-box;
+  min-height: var(--control-height);
+  height: var(--control-height);
+  line-height: 1;
+
+  position: relative;
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 2px;
+  overflow: auto;
+  padding: 2px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--report-period-bg);
+  outline: none;
+  scrollbar-width: none;
+  white-space: nowrap;
+  -ms-overflow-style: none;
+}
+
+html body #reportPanel .period-presets::-webkit-scrollbar { display: none; }
+
+html body #reportPanel .period-presets-indicator {
+  position: absolute;
+  z-index: 0;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 0;
+  border-radius: 6px;
+  background: var(--report-period-indicator);
+  box-shadow: var(--report-period-shadow);
+  pointer-events: none;
+  transform: translate3d(2px, 0, 0);
+  transition: width 300ms cubic-bezier(.19, 1, .22, 1), transform 300ms cubic-bezier(.19, 1, .22, 1), opacity 150ms ease;
+}
+
+html body #reportPanel .period-presets > .preset-button {
+  position: relative;
+  z-index: 1;
+  min-width: max-content;
+  height: calc(var(--control-height) - 4px);
+  min-height: calc(var(--control-height) - 4px);
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--report-period-muted);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: none;
+  transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+html body #reportPanel .period-presets > .preset-button .relative {
+  position: relative;
+  z-index: 2;
+}
+
+html body #reportPanel .period-presets > .preset-button::before {
+  position: absolute;
+  z-index: -1;
+  inset: 1px;
+  border-radius: inherit;
+  background: var(--report-period-hover);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1);
+  transition: opacity 150ms ease, transform 150ms ease;
+  will-change: transform;
+}
+
+html body #reportPanel .period-presets > .preset-button[data-state="on"] {
+  color: var(--report-period-fg);
+}
+
+html body #reportPanel .period-presets > .preset-button:focus-visible,
+html body #reportPanel .period-presets:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+html body #reportPanel .period-presets > .preset-button[data-state="off"]:focus-visible {
+  color: var(--report-period-fg);
+}
+
+html body #reportPanel .period-presets > .preset-button:active::before {
+  transform: scale(.96, .97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html body #reportPanel .period-presets > .preset-button[data-state="off"]:not([data-disabled]):not(:disabled):hover {
+    color: var(--report-period-fg);
+  }
+
+  html body #reportPanel .period-presets > .preset-button[data-state="off"]:not([data-disabled]):not(:disabled):hover::before {
+    opacity: .5;
+  }
+}
+
+html body #reportPanel .period-presets > .preset-button[data-disabled],
+html body #reportPanel .period-presets > .preset-button:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+html body #reportPanel .period-presets > .preset-button[data-disabled]::before,
+html body #reportPanel .period-presets > .preset-button:disabled::before {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html body #reportPanel .period-presets-indicator,
+  html body #reportPanel .period-presets > .preset-button,
+  html body #reportPanel .period-presets > .preset-button::before {
+    transition-duration: 1ms;
+  }
+}
+
+html body #reportPanel .period-navigation {
+  box-sizing: border-box;
+  min-height: var(--control-height);
+  height: var(--control-height);
+  border: 0;
+  border-radius: 8px;
+  background: var(--report-period-bg);
+  padding: 2px;
+}
+
+html body #reportPanel .period-navigation .period-shift-button {
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  background: transparent;
+  color: var(--report-period-muted);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  font-weight: 700;
+  line-height: 1;
+  height: calc(var(--control-height) - 4px);
+  min-height: calc(var(--control-height) - 4px);
+  padding: 0;
+  overflow: hidden;
+  overflow-wrap: normal;
+  border-radius: 6px;
+  box-shadow: none;
+  transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+html body #reportPanel .period-navigation .period-shift-button::before {
+  position: absolute;
+  z-index: -1;
+  inset: 1px;
+  border-radius: inherit;
+  background: var(--report-period-hover);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1);
+  transition: opacity 150ms ease, transform 150ms ease;
+  will-change: transform;
+}
+
+html body #reportPanel .period-navigation .period-shift-button:focus-visible,
+html body #reportPanel .period-navigation:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+html body #reportPanel .period-navigation .period-shift-button:active::before {
+  transform: scale(.96, .97);
+}
+
+html body #reportPanel .period-navigation .period-shift-button:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+html body #reportPanel .period-navigation .period-shift-button:disabled::before {
+  opacity: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html body #reportPanel .period-navigation .period-shift-button:not([data-disabled]):not(:disabled):hover {
+    color: var(--report-period-fg);
+  }
+
+  html body #reportPanel .period-navigation .period-shift-button:not([data-disabled]):not(:disabled):hover::before {
+    opacity: .5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html body #reportPanel .period-navigation .period-shift-button,
+  html body #reportPanel .period-navigation .period-shift-button::before {
+    transition-duration: 1ms;
+  }
+}
+
+html body #reportPanel .period-navigation .period-shift-step-label {
+  box-sizing: border-box;
+  height: calc(var(--control-height) - 4px);
+  min-height: calc(var(--control-height) - 4px);
+  overflow: hidden;
+  overflow-wrap: normal;
+  color: var(--report-period-muted);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* The active range is contextual information, not another control. */
+html body #reportPanel .period-date-range {
+  display: inline-flex;
+  min-width: max-content;
+  min-height: var(--control-height);
+  align-items: center;
+  flex: 0 0 auto;
+  padding-inline: 2px;
+  color: color-mix(in srgb, var(--text-muted) 76%, var(--surface));
+  font-family: var(--font-ui);
+  font-size: max(11px, calc(var(--ui-font-size) - 2px));
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+html body #reportPanel .period-navigation.is-missing-range .period-shift-step-label {
+  min-width: max-content;
+  padding-inline: 8px;
+  color: var(--report-period-muted);
+}
+
+html body #reportPanel .period-navigation.is-missing-range .period-shift-button:disabled {
+  opacity: 0.32;
+}
+
+/* Logs-style report surface, horizontal dividers, and underline tabs. */
+html body #mainPanel,
+html body #mainPanel .report-toolbar,
+html body #mainPanel .member-switch-bar,
+html body #mainPanel .table-card,
+html body #mainPanel .table-scroll,
+html body #mainPanel .table-content {
+  background: var(--surface);
+}
+
+html body #reportPanel .table-card {
+  position: relative;
+  display: flex;
+  height: fit-content;
+  min-height: 0;
+  max-height: 100%;
+  flex: 0 1 auto;
+  align-self: stretch;
+  flex-direction: column;
+  overflow: hidden;
+  margin: 0;
+  padding: 0 18px;
+  border: 0;
+  background: transparent;
+}
+
+html body #reportPanel .table-scroll {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  flex: 0 1 auto;
+  overflow: auto;
+  border: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  isolation: isolate;
+}
+
+html body #reportPanel .table-content {
+  border-top: 0;
+  border-bottom: 1px solid var(--table-border);
+}
+
+html body #reportPanel table :is(th, td) {
+  border-left: 0;
+  border-right: 1px solid var(--table-border);
+  border-bottom: 0;
+  border-bottom-color: var(--table-border);
+}
+
+html body #reportPanel table thead th {
+  border-top: 1px solid var(--table-border);
+  border-bottom: 1px solid var(--table-border);
+  background: var(--table-header-bg);
+}
+
+html body #reportPanel table tbody tr + tr > :is(th, td) {
+  border-top: 1px solid var(--table-border);
+}
+
+html body #reportPanel table tbody tr.member-group-start > :is(th, td) {
+  border-top: 1px solid var(--table-border);
+}
+
+html body #reportPanel table :is(th, td).date-col {
+  border-left: 0;
+  border-right: 1px solid var(--table-border);
+}
+
+html body #reportPanel table thead th:first-child,
+html body #reportPanel table tbody th.user-col {
+  border-left: 1px solid var(--table-border);
+}
+
+/* Refresh-button style data reload action. */
+html body #reportPanel #refreshButton {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  display: inline-flex;
+  width: 42px;
+  height: var(--control-height);
+  min-height: var(--control-height);
+  flex: 0 0 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid var(--action-secondary-border);
+  border-radius: var(--radius-control);
+  background: var(--action-secondary-bg);
+  color: var(--action-secondary-fg);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+  transition: transform 100ms ease, background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+html body #reportPanel #refreshButton:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+html body #reportPanel #refreshButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+html body #reportPanel #refreshButton:disabled {
+  border-color: var(--control-disabled-border);
+  background: var(--control-disabled-bg);
+  color: var(--control-disabled-fg);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+html body #reportPanel #refreshButton > .toolbar-button-icon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  width: 18px;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+html body #reportPanel #refreshButton > .toolbar-button-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+html body #reportPanel #refreshButton > .toolbar-button-icon svg.is-refresh-icon {
+  fill: currentColor;
+  stroke: none;
+}
+
+html body #reportPanel #refreshButton > .toolbar-button-icon svg.is-loader-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+/* Compact data-refresh action shared by reports, administration, and settings. */
+html body .data-refresh-button {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  display: inline-flex;
+  width: 42px;
+  height: var(--control-height);
+  min-height: var(--control-height);
+  flex: 0 0 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid var(--action-secondary-border);
+  border-radius: var(--radius-control);
+  background: var(--action-secondary-bg);
+  color: var(--action-secondary-fg);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+  transition: transform 100ms ease, background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+html body .data-refresh-button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--action-secondary-hover-fg);
+}
+
+html body .data-refresh-button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+html body .data-refresh-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+html body .data-refresh-button:disabled {
+  border-color: var(--control-disabled-border);
+  background: var(--control-disabled-bg);
+  color: var(--control-disabled-fg);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+html body .data-refresh-button > .toolbar-button-icon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  width: 18px;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+html body .data-refresh-button > .toolbar-button-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+html body .data-refresh-button > .toolbar-button-icon svg.is-refresh-icon {
+  fill: currentColor;
+  stroke: none;
+}
+
+html body .data-refresh-button > .toolbar-button-icon svg.is-loader-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+/* 枠線と背景を本体で描画し、角丸の内側に隙間が生じるのを防ぐ。 */
+html body #reportPanel #saveButton {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  display: inline-flex;
+  height: var(--control-height);
+  min-height: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--action-primary-border);
+  border-radius: var(--radius-control);
+  background: var(--action-primary-bg);
+  color: var(--action-primary-fg);
+  overflow: visible;
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background-color 150ms ease, color 150ms ease, transform 100ms ease;
+}
+
+html body #reportPanel #saveButton > * {
+  position: relative;
+  z-index: 1;
+}
+
+html body #reportPanel #saveButton > .save-pending-indicator {
+  position: absolute;
+  top: -7px;
+  right: -11px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--danger-primary-bg);
+  pointer-events: none;
+}
+
+html body #reportPanel #saveButton:hover:not(:disabled) {
+  background: var(--action-primary-hover-bg);
+}
+
+html body #reportPanel #saveButton:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+html body #reportPanel #saveButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+html body #reportPanel #saveButton:disabled {
+  cursor: not-allowed;
+  border-color: var(--control-disabled-border);
+  background: var(--control-disabled-bg);
+  color: var(--control-disabled-fg);
+  opacity: 1;
+}
+
+/* Comment-target filters. */
+html body #reportPanel .member-switch-list {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  padding-bottom: 10px;
+}
+
+html body #reportPanel #bossSearchControl > #showSelfButton {
+  margin-right: 24px;
+}
+
+html body #reportPanel #bossSearchControl > #missingCommentsFilterGroup {
+  margin-left: 0;
+  margin-right: 24px;
+  gap: 0;
+}
+
+html body #reportPanel .member-switch-bar {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  border-bottom: 0;
+  background: transparent;
+  padding: 12px 18px 14px;
+}
+
+html body #reportPanel .member-switch-button {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  display: inline-flex;
+  width: max-content;
+  max-width: min(220px, 100%);
+
+  min-height: 28px;
+  height: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex: 0 0 auto;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--filter-idle-fg);
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.75px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 100ms ease, color 150ms ease;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+html body #reportPanel .member-switch-button::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--filter-idle-bg);
+  content: "";
+  pointer-events: none;
+}
+
+html body #reportPanel .member-switch-button > .relative {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  height: auto;
+  min-height: 14px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  gap: 4px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html body #reportPanel .member-switch-button:hover:not(:disabled)::before {
+  background: var(--filter-idle-hover-bg);
+}
+
+html body #reportPanel .member-switch-button:hover:not(:disabled) {
+  color: var(--filter-idle-hover-fg);
+}
+
+html body #reportPanel .member-switch-button:is(.is-active, [aria-pressed="true"]) {
+  border: 0;
+  background: var(--filter-active-bg);
+  color: var(--filter-active-fg);
+  box-shadow: none;
+}
+
+html body #reportPanel .member-switch-button:is(.is-active, [aria-pressed="true"])::before {
+  background: var(--filter-active-bg);
+  box-shadow: inset 0 0 0 1px var(--filter-active-border);
+}
+
+html body #reportPanel .member-switch-button:is(.is-active, [aria-pressed="true"]):hover:not(:disabled)::before {
+  background: var(--filter-active-hover-bg);
+}
+
+html body #reportPanel .member-switch-button:is(.is-active, [aria-pressed="true"]):hover:not(:disabled) {
+  color: var(--filter-active-fg);
+}
+
+html body #reportPanel .member-switch-button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+html body #reportPanel .member-switch-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+html body #reportPanel .member-switch-button:disabled {
+  cursor: not-allowed;
+  border-color: transparent;
+  background: var(--filter-disabled-bg);
+  color: var(--filter-disabled-fg);
+  opacity: 1;
+}
+
+html body #reportPanel .member-switch-button:disabled::before {
+  opacity: 0;
+}
+
+/* 0件は未選択ボタンと同じ背景にし、ホバーでは強調しない。 */
+html body #reportPanel #showMissingCommentsButton:disabled {
+  background: var(--filter-idle-bg);
+  border: 0;
+  box-shadow: none;
+  color: var(--filter-disabled-fg);
+}
+
+html body #reportPanel #showMissingCommentsButton:disabled .missing-count-badge {
+  background: var(--filter-idle-hover-bg);
+  color: var(--text-muted);
+}
+
+html body #reportPanel #refreshButton:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--action-secondary-hover-fg);
+}
+
+html body #reportPanel .toolbar-right > .toolbar-button {
+  box-sizing: border-box;
+  min-height: var(--control-height);
+  height: var(--control-height);
+  line-height: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  overflow-wrap: normal;
+  padding-block: 0;
+  font-family: var(--font-ui);
+  font-size: var(--ui-font-size);
+  font-weight: 700;
+}
+
+/* Active missing-comment filtering keeps the same hover contrast as active member filters. */
+
+/* Keep period actions and save controls on the same row at the minimum window width. */
+@media (max-width: 1100px) {
+  html body #reportPanel .toolbar-filter-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 10px;
+  }
+
+  html body #reportPanel .toolbar-filter-row .toolbar-left-wide {
+    grid-column: 1;
+    grid-row: 1;
+    width: auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+  }
+
+  html body #reportPanel .toolbar-filter-row .period-main-controls {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow: visible;
+  }
+
+  html body #reportPanel .toolbar-filter-row .toolbar-right {
+    grid-column: 2;
+    grid-row: 1;
+    margin-left: 0;
+  }
+
+  html body #reportPanel.is-missing-mode .toolbar-filter-row .period-main-controls {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  html body #reportPanel.is-missing-mode .toolbar-filter-row .toolbar-right {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  html body #reportPanel .member-switch-list {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+}
+
+@media (max-width: 760px) {
+  html body #reportPanel .missing-filter-group {
+    margin-left: 0;
+  }
+
+  html body #reportPanel .toolbar-filter-row .toolbar-left-wide {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+  }
+
+  html body #reportPanel .toolbar-filter-row .toolbar-right {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-content: flex-end;
+  }
+
+  html body #reportPanel .toolbar-filter-row .period-main-controls {
+    grid-row: 2;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  html body #reportPanel.is-missing-mode .toolbar-filter-row .period-main-controls {
+    grid-row: 1;
+  }
+
+  html body #reportPanel.is-missing-mode .toolbar-filter-row .toolbar-right {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 520px) {
+  html body #reportPanel .toolbar-filter-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html body #reportPanel .toolbar-right,
+  html body #reportPanel .period-main-controls {
+    grid-column: 1;
+    width: 100%;
+  }
+
+  html body #reportPanel.is-missing-mode .toolbar-filter-row .period-main-controls {
+    grid-row: 1;
+  }
+
+  html body #reportPanel.is-missing-mode .toolbar-filter-row .toolbar-right {
+    grid-column: 1;
+    grid-row: 2;
+    justify-content: flex-start;
+  }
+}
+
+/* Keep report cells on the selected size through explicit component scopes. */
+html body[data-font-size] #tableWrap table :is(th, td),
+html body[data-font-size] #tableWrap .user-content,
+html body[data-font-size] #tableWrap .editable-content,
+html body[data-font-size] #tableWrap .comment-stack,
+html body[data-font-size] #tableWrap .reply-card-content {
+  font-size: var(--ui-font-size);
+}
+
+html body[data-font-size] #reportPanel table thead th .column-header-you {
+  font-size: max(1px, calc(var(--ui-font-size) - 2px));
+  line-height: 1.1;
+}
+
+html body #reportPanel .missing-count-badge,
+html body #reportPanel .date-today-label {
+  padding-top: 3px;
+  padding-bottom: 0;
+}
+
+html body #reportPanel .date-today-label,
+html body #reportPanel table thead th .column-header-you {
+  --ui-text-offset-y: 0px;
+  top: 0;
+}
+
+html body #reportPanel table thead th .column-header-you {
+  padding-top: 3px;
+  padding-bottom: 0;
+}
+
+/* Keep the header surface neutral and move the self-comment emphasis into
+   the compact label beside the boss name. */
+html body #reportPanel table thead th.self-comment-col {
+  background: var(--table-header-bg);
+  color: var(--text-muted);
+}
+
+html body #reportPanel td.self-comment-col:not(.comment-not-applicable):not(.is-dirty-cell):not(:has(.is-editing)):not(:hover) {
+  background: var(--table-cell-bg);
+}
+
+/* Move the role emphasis into a compact label beside the boss name. */
+html body #reportPanel table thead th .column-header-you {
+  border: 1px solid var(--self-label-border);
+  background: var(--self-label-bg);
+  color: var(--self-label-fg);
+}
+
+html[data-color-palette="blue_white"][data-theme="light"] body #reportPanel {
+  --table-header-bg: #fafafa;
+  --self-label-bg: rgb(37 99 235 / 12%);
+  --self-label-fg: #2563eb;
+  --self-label-border: #2563eb;
+}
+
+html[data-color-palette="blue"][data-theme="light"] body #reportPanel {
+  --self-label-bg: rgb(0 99 153 / 12%);
+  --self-label-fg: #006399;
+  --self-label-border: #006399;
+}
+
+html[data-color-palette="default"][data-theme="light"] body #reportPanel {
+  --self-label-bg: rgb(0 134 53 / 12%);
+  --self-label-fg: #008635;
+  --self-label-border: #008635;
+}
+
+html[data-color-palette="blue_white"][data-theme="dark"] body #reportPanel {
+  --self-label-bg: rgb(96 165 250 / 18%);
+  --self-label-fg: #93c5fd;
+  --self-label-border: #60a5fa;
+}
+
+html[data-color-palette="blue"][data-theme="dark"] body #reportPanel {
+  --self-label-bg: rgb(40 147 204 / 18%);
+  --self-label-fg: #64b7e4;
+  --self-label-border: #2893cc;
+}
+
+html[data-color-palette="default"][data-theme="dark"] body #reportPanel {
+  --self-label-bg: rgb(4 184 76 / 16%);
+  --self-label-fg: #04b84c;
+  --self-label-border: #04b84c;
+}
+
+html body #reportPanel table tbody tr.is-today > td.date-col {
+  background: var(--table-cell-bg);
+  color: var(--text);
+}
+
+html body #reportPanel table tbody tr.holiday.is-today > td.date-col {
+  background: var(--holiday-row-bg);
+}
+
+html body #reportPanel .date-today-label {
+  --today-label-bg: var(--self-label-bg);
+  --today-label-fg: var(--self-label-fg);
+  display: inline-flex;
+  width: max-content;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  margin-top: 3px;
+  padding: 2px 6px 1px;
+  border-radius: 4px;
+  border: 1px solid var(--self-label-border);
+  background: var(--today-label-bg);
+  color: var(--today-label-fg);
+  font-size: max(1px, calc(var(--ui-font-size) - 2px));
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+html body #reportPanel .period-shift-step-label,
+html body #reportPanel .period-presets > .preset-button .relative,
+html body #reportPanel .member-switch-button > .relative,
+html body #reportPanel .missing-filter-label,
+html body #reportPanel .toolbar-button-label,
+html body #reportPanel .column-header-label,
+html body #reportPanel .date-value,
+html body #reportPanel .date-weekday,
+html body #reportPanel .cell-sub-label,
+html body #reportPanel .cell-frame:not(:has(> *)) {
+  top: var(--ui-text-offset-y);
+}
+
+html body #reportPanel #showMissingCommentsButton {
+  gap: 8px;
+  max-width: none;
+}
+html body #reportPanel #showMissingCommentsButton .missing-count-badge {
+  position: static;
+  flex: 0 0 auto;
+  border: 0;
+  box-shadow: none;
+}
+html body #reportPanel.is-missing-mode .period-date-range {
+  display: none;
+}

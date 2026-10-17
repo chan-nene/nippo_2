@@ -1,0 +1,43 @@
+# Local settings and runtime data
+settings.ini
+storage.ini
+nippo-admin.key
+issue.md
+cache/
+logs/
+text/
+tests/
+test_data*/
+.agent/
+.hallmark/
+web/vendor/
+tools/
+.agents/
+package.json
+!frontend/package.json
+nippo-rust-tauri/
+poc/
+ui-startup-benchmark/
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Build outputs
+build/
+dist/
+*.spec
+
+# Node dependencies
+node_modules/
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
