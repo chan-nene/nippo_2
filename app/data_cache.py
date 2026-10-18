@@ -11,7 +11,7 @@ from threading import RLock
 from time import perf_counter
 from typing import Any
 
-import polars as pl
+from app.sqlite_table import Table
 
 from app.config import AppSettings
 from app.repository import DailyReportRepository, USER_COLUMNS, USER_KEYS, COMMENT_COLUMNS, COMMENT_KEYS
@@ -33,9 +33,9 @@ class CacheSnapshot:
     employee_id: str
     common: dict[str, list[dict[str, Any]]]
     common_revisions: dict[str, str]
-    report_partitions: dict[str, pl.DataFrame]
+    report_partitions: dict[str, Table]
     report_revisions: dict[str, str]
-    comment_partitions: dict[str, pl.DataFrame]
+    comment_partitions: dict[str, Table]
     file_manifest: dict[str, FileFingerprint]
     target_employee_ids: tuple[str, ...]
     generation: int
@@ -81,7 +81,7 @@ class DailyReportDataCache:
         self._snapshot: CacheSnapshot | None = None
         self._generation = 0
         self._invalid_paths: set[str] = set()
-        self._combined: tuple[int, pl.DataFrame, pl.DataFrame] | None = None
+        self._combined: tuple[int, Table, Table] | None = None
         self._review_summary: tuple[tuple[Any, ...], dict[str, Any]] | None = None
         self._views: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
         self._startup_common = None
@@ -320,7 +320,7 @@ class DailyReportDataCache:
 
     def _combined_frames(
         self, snapshot: CacheSnapshot, repository: DailyReportRepository
-    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+    ) -> tuple[Table, Table]:
         # A bounded, generation-scoped cache. The lock prevents an old reader
         # from mixing frames with a concurrently published snapshot.
         with self._lock:
@@ -334,7 +334,7 @@ class DailyReportDataCache:
 
     def _missing_summary(
         self, snapshot: CacheSnapshot, repository: DailyReportRepository,
-        users: pl.DataFrame, comments: pl.DataFrame,
+        users: Table, comments: Table,
         *, assigned_subordinate_ids: set[str] | None = None,
     ) -> dict[str, Any]:
         key = (snapshot.generation, repository.today_jst(),
@@ -429,7 +429,7 @@ class DailyReportDataCache:
         failed = {item["employee_id"] for item in snapshot.report_load_failures}
         targets = sorted(set(target_ids) & set(scope["target_employee_ids"]) - failed)
         rows, _, _ = repository._build_rows(
-            users.filter(pl.col("employee_id").is_in(targets)), comments,
+            users.where_in("employee_id", targets), comments,
             snapshot.common, employee_id, scope["assigned_subordinate_ids"], targets,
             start_date, end_date, summary,
             failed_comment_superior_ids={item["superior_employee_id"] for item in snapshot.comment_load_failures},
@@ -472,8 +472,8 @@ class DailyReportDataCache:
         self,
         settings: AppSettings,
         employee_id: str,
-        report_partition: tuple[Path | str, pl.DataFrame] | None = None,
-        comment_partition: tuple[Path | str, pl.DataFrame] | None = None,
+        report_partition: tuple[Path | str, Table] | None = None,
+        comment_partition: tuple[Path | str, Table] | None = None,
         report_revision: str | None = None,
         report_fingerprint: tuple[int, int] | None = None,
     ) -> bool:
@@ -566,8 +566,8 @@ class DailyReportDataCache:
         scope = repository.resolve_view_scope(common, employee_id)
         target_ids = tuple(scope["target_employee_ids"])
         target_set = set(target_ids)
-        report_partitions: dict[str, pl.DataFrame] = {}
-        comment_partitions: dict[str, pl.DataFrame] = {}
+        report_partitions: dict[str, Table] = {}
+        comment_partitions: dict[str, Table] = {}
         report_load_failures: list[dict[str, str]] = []
         comment_load_failures: list[dict[str, str]] = []
         manifest: dict[str, FileFingerprint] = {}
@@ -1196,21 +1196,21 @@ class DailyReportDataCache:
         self,
         settings: AppSettings,
         repository: DailyReportRepository,
-        reports: dict[str, pl.DataFrame],
-        comments: dict[str, pl.DataFrame],
+        reports: dict[str, Table],
+        comments: dict[str, Table],
         manifest: dict[str, FileFingerprint],
         old_target_ids: tuple[str, ...],
         new_target_ids: tuple[str, ...],
         common: dict[str, list[dict[str, Any]]] | None = None,
     ) -> tuple[
-        dict[str, pl.DataFrame],
-        dict[str, pl.DataFrame],
+        dict[str, Table],
+        dict[str, Table],
         dict[str, FileFingerprint],
         tuple[dict[str, str], ...],
         int,
     ]:
-        new_reports: dict[str, pl.DataFrame] = {}
-        new_comments: dict[str, pl.DataFrame] = {}
+        new_reports: dict[str, Table] = {}
+        new_comments: dict[str, Table] = {}
         new_manifest = dict(manifest)
         warnings: list[dict[str, str]] = []
         reads = 0
@@ -1304,17 +1304,13 @@ class DailyReportDataCache:
 
     @staticmethod
     def _filter_comment_frame(
-        frame: pl.DataFrame, target_employee_ids: set[str]
-    ) -> pl.DataFrame:
+        frame: Table, target_employee_ids: set[str]
+    ) -> Table:
         if frame.is_empty() or not target_employee_ids:
             return frame.head(0)
         if "subordinate_employee_id" not in frame.columns:
             return frame.head(0)
-        return frame.filter(
-            pl.col("subordinate_employee_id").cast(pl.String).is_in(
-                sorted(target_employee_ids)
-            )
-        )
+        return frame.where_in("subordinate_employee_id", sorted(target_employee_ids))
 
     @staticmethod
     def _common_paths(settings: AppSettings) -> dict[str, Path]:

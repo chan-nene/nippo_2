@@ -23,6 +23,8 @@ CSVをデータストアとして利用する、pywebview製の日報デスク�
 
 アプリからのCSV保存は、Excelで日本語を開けるようUTF-8 BOM付きで行います。既存のBOMなしUTF-8・CP932のCSVも読み込み可能で、次回保存時にUTF-8 BOM付きになります。
 
+CSVの読み書きにはPython標準の`csv`、結合・抽出・重複整理には標準の`sqlite3`を使用します。DBはプロセス内のメモリだけに置き、終了時に破棄します。保存先は従来どおりCSVで、永続DBファイルは作りません。ファイル単位・世代単位のキャッシュを維持し、更新時はSQLiteの新しい表へ差し替えるため、処理中の古いスナップショットに更新後の行が混ざりません。SQLite接続へのアクセスはスレッド間で直列化しています。
+
 - `administration.csv`: `record_type,employee_id,display_name,can_input_own_report,employment_type,is_admin,affiliation_type,organization_id,member_order,team_id,team_name,team_type,parent_team_id,sort_order,commenter_employee_id,target_type,target_organization_ids,target_employee_ids`
 - `record_type` は `user_master`（ユーザー）、`team_master`（組織）、`comment_assignment`（コメント担当設定）のいずれかです。該当しない列は空欄です。
 - `calendar.csv`: `date`（管理CSVとは別に保存）

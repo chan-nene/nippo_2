@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import date, datetime, timezone
 import json
 from uuid import UUID
-import polars as pl
+from app.sqlite_table import Table
 from app.rich_text import EMPTY_RICH_TEXT, serialize
 from app.security import validate_employee_id, safe_employee_csv_path, RequestValidationError
 
@@ -18,7 +18,7 @@ VIEW_COMMENTS = ['superior_employee_id','subordinate_employee_id','date','commen
 REACTIONS = {'like','understood','cry','bow'}
 
 def frame(rows, columns):
-    return pl.DataFrame([{k:str(r.get(k,'') or '') for k in columns} for r in rows],schema={k:pl.String for k in columns})
+    return Table([{k:str(r.get(k,'') or '') for k in columns} for r in rows], columns)
 
 def uuid(value):
     if not isinstance(value,str) or str(UUID(value)) != value or UUID(value).version != 4:
@@ -45,7 +45,7 @@ def validate_frame(df, owner, side):
     columns=USER_COLUMNS if side=='user' else COMMENT_COLUMNS
     keys=USER_KEYS if side=='user' else COMMENT_KEYS
     if df.columns != columns: raise ValueError('会話形式のCSV列と一致しません。変換が必要です。')
-    if df.select(keys).is_duplicated().any(): raise ValueError('レコードが重複しています。')
+    if df.has_duplicates(keys): raise ValueError('レコードが重複しています。')
     ids=set(); initials=set()
     for r in df.iter_rows(named=True):
         day(r['date'])
@@ -81,17 +81,16 @@ def validate_frame(df, owner, side):
             if r['target_author_employee_id'] != (superior if side=='user' else subordinate): raise ValueError('相手の投稿のみリアクションできます。')
 
 def project_users(df):
-    rows=[]
-    for r in df.iter_rows(named=True):
-        if r['record_type']=='report': rows.append(r)
-    return frame(rows,VIEW_USERS)
+    return df.where("record_type = 'report'").ensure_columns(VIEW_USERS)
+
 
 def project_comments(df):
-    rows=[]
-    for r in df.iter_rows(named=True):
-        if r['record_type']=='message' and r['message_kind']=='initial_comment':
-            rows.append({**r,'comment':'' if r['deleted_at'] else r['message_text'],'comment_rich_text':EMPTY_RICH_TEXT if r['deleted_at'] else r['message_rich_text']})
-    return frame(rows,VIEW_COMMENTS)
+    return df.where("record_type = 'message' AND message_kind = 'initial_comment'").with_column(
+        'comment', "CASE WHEN deleted_at != '' THEN '' ELSE message_text END"
+    ).with_column('comment_rich_text',
+        "CASE WHEN deleted_at != '' THEN ? ELSE message_rich_text END", (EMPTY_RICH_TEXT,)
+    ).select(VIEW_COMMENTS)
+
 
 def conversation_index(users,comments):
     groups=defaultdict(list); reactions=[]

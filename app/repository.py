@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 from app import conversations as conversation
-import io
 from contextlib import contextmanager
 import logging
 import os
@@ -15,7 +14,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-import polars as pl
+from app.sqlite_table import Table, concat, read_csv, quote
 from app.rich_text import RICH_FIELDS, EMPTY_RICH_TEXT, serialize as serialize_rich_text
 
 from app.calendar_policy import DEFAULT_MISSING_COMMENT_START_DATE
@@ -155,12 +154,12 @@ class DailyReportRepository:
                 source = self._read_csv_bytes(raw)
                 if source.columns != ADMINISTRATION_COLUMNS:
                     raise ValueError("管理CSVの列が現行形式と一致しません。")
-                if not set(source["record_type"].to_list()) <= set(ORGANIZATION_MASTERS):
+                if not set(source.column_values("record_type")) <= set(ORGANIZATION_MASTERS):
                     raise ValueError("管理CSVに不正なデータ種別があります。")
                 revision = hashlib.sha256(raw).hexdigest()
                 self.loaded_common_revisions.update(dict.fromkeys(ORGANIZATION_MASTERS, revision))
                 frames = {
-                    master: source.filter(pl.col("record_type") == master).select(
+                    master: source.where("record_type = ?", (master,)).select(
                         list(COMMON_MASTER_COLUMNS[master])
                     ) for master in ORGANIZATION_MASTERS
                 }
@@ -170,7 +169,7 @@ class DailyReportRepository:
             except Exception as exc:
                 self._record_load_warning(unified, exc)
                 return [], [], [], "new"
-        frames: dict[str, pl.DataFrame] = {}
+        frames: dict[str, Table] = {}
         for master in ("user_master", "team_master", "comment_assignment"):
             path = common_dir / f"{master}.csv"
             columns = list(COMMON_MASTER_COLUMNS[master])
@@ -192,7 +191,7 @@ class DailyReportRepository:
         )
 
 
-    def _normalize_user_rows(self, source: pl.DataFrame) -> list[dict[str, Any]]:
+    def _normalize_user_rows(self, source: Table) -> list[dict[str, Any]]:
         columns = list(COMMON_MASTER_COLUMNS["user_master"])
         rows = self._ensure_columns(source, columns).to_dicts()
         for row in rows:
@@ -272,7 +271,7 @@ class DailyReportRepository:
             for row in rows
         ]
         df = (
-            pl.DataFrame(normalized, schema=columns, orient="row")
+            Table(normalized, columns=columns)
             if normalized
             else self._empty_df(columns)
         )
@@ -363,7 +362,7 @@ class DailyReportRepository:
             for row in self._common_master_frame(master, values).to_dicts():
                 rows.append({column: master if column == "record_type" else row.get(column, "")
                              for column in ADMINISTRATION_COLUMNS})
-        frame = pl.DataFrame(rows, schema=ADMINISTRATION_COLUMNS, orient="row") if rows else self._empty_df(ADMINISTRATION_COLUMNS)
+        frame = Table(rows, columns=ADMINISTRATION_COLUMNS) if rows else self._empty_df(ADMINISTRATION_COLUMNS)
         target = self.storage_dir("common") / "administration.csv"
         self._write_csv_atomically(frame, target, "common")
         revision = self._common_master_revision(target)
@@ -371,7 +370,7 @@ class DailyReportRepository:
 
     def _common_master_frame(
         self, master: str, rows: list[dict[str, str]]
-    ) -> pl.DataFrame:
+    ) -> Table:
         columns = list(COMMON_MASTER_COLUMNS[master])
         normalized = [
             {column: str(row.get(column, "")) for column in columns}
@@ -383,7 +382,7 @@ class DailyReportRepository:
                     if not row[column].strip():
                         row[column] = default
         return (
-            pl.DataFrame(normalized, schema=columns, orient="row")
+            Table(normalized, columns=columns)
             if normalized
             else self._empty_df(columns)
         )
@@ -409,19 +408,15 @@ class DailyReportRepository:
             self._record_load_warning(path, exc)
             return []
 
-    def _read_csv_frame(self, path: Path) -> pl.DataFrame:
+    def _read_csv_frame(self, path: Path) -> Table:
         return self._read_csv_bytes(path.read_bytes())
 
-    def _read_csv_bytes(self, raw: bytes) -> pl.DataFrame:
+    def _read_csv_bytes(self, raw: bytes) -> Table:
         """同一の読み取り結果からCSVと競合確認用ハッシュを生成する。"""
         errors: list[str] = []
         for encoding in CSV_ENCODINGS:
             try:
-                return pl.read_csv(
-                    io.BytesIO(raw),
-                    infer_schema_length=0,
-                    encoding=encoding,
-                ).fill_null("")
+                return read_csv(raw, encoding)
             except Exception as exc:
                 errors.append(f"{encoding}: {exc}")
         raise RuntimeError(" / ".join(errors))
@@ -508,8 +503,8 @@ class DailyReportRepository:
         self,
         employee_id: str,
         common: dict[str, list[dict[str, Any]]],
-        users_df: pl.DataFrame,
-        comments_df: pl.DataFrame,
+        users_df: Table,
+        comments_df: Table,
         start_date: str | None = None,
         end_date: str | None = None,
         period_preset: str | None = None,
@@ -605,9 +600,9 @@ class DailyReportRepository:
         )
         if failed_report_ids and len(rows):
             if columnar_rows:
-                rows = rows.with_columns(
-                    (pl.col("can_edit_report") & ~pl.col("employee_id").is_in(list(failed_report_ids))).alias("can_edit_report")
-                )
+                rows = rows.with_column("can_edit_report",
+                    "can_edit_report AND employee_id NOT IN (SELECT value FROM json_each(?))",
+                    (json.dumps(list(failed_report_ids)),))
             else:
                 for row in rows:
                     if row["employee_id"] in failed_report_ids:
@@ -1086,8 +1081,8 @@ class DailyReportRepository:
 
     def _build_missing_comment_summary(
         self,
-        users_df: pl.DataFrame,
-        comments_df: pl.DataFrame,
+        users_df: Table,
+        comments_df: Table,
         common: dict[str, list[dict[str, Any]]],
         employee_id: str,
         target_employee_ids: list[str],
@@ -1130,47 +1125,34 @@ class DailyReportRepository:
             if self._calendar_row_is_holiday(row)
             and (calendar_date := self._to_date(row.get("date"))) is not None
         }
-        days = pl.DataFrame({"date": pl.date_range(range_start, range_end, eager=True)}).lazy().filter(
-            ~pl.col("date").is_in(list(holiday_dates))
-        ).with_columns(pl.col("date").dt.to_string("%Y-%m-%d"))
-        candidates = pl.DataFrame({"employee_id": subordinate_ids}).lazy().join(
-            days, how="cross"
-        )
-        holiday_reports = users_df.lazy().cast(pl.String).filter(
-            (pl.col("record_type") == "report")
-            & pl.col("employee_id").is_in(subordinate_ids)
-            & pl.col("date").is_in([day.isoformat() for day in holiday_dates])
-            & pl.col("date").is_between(pl.lit(range_start.isoformat()), pl.lit(range_end.isoformat()))
-            & ((pl.col("business_name").fill_null("").str.strip_chars() != "")
-               | (pl.col("business_detail").fill_null("").str.strip_chars() != ""))
-        ).select("employee_id", "date")
-        candidates = pl.concat([candidates, holiday_reports]).unique()
-        if not self.settings.include_empty_report_days_in_missing_comments:
-            report_days = users_df.lazy().cast(pl.String).filter(
-                (pl.col("record_type") == "report")
-                & pl.col("employee_id").is_in(subordinate_ids)
-                & pl.col("date").is_between(
-                    pl.lit(range_start.isoformat()), pl.lit(range_end.isoformat())
-                )
-                & (
-                    (pl.col("business_name").fill_null("").str.strip_chars() != "")
-                    | (pl.col("business_detail").fill_null("").str.strip_chars() != "")
-                )
-            ).select("employee_id", "date").unique()
-            candidates = candidates.join(
-                report_days, on=["employee_id", "date"], how="inner"
+        days = Table([{"date": (range_start + timedelta(days=n)).isoformat(),
+                       "is_holiday": range_start + timedelta(days=n) in holiday_dates}
+                      for n in range((range_end - range_start).days + 1)], ["date", "is_holiday"])
+        members = Table([{"employee_id": eid} for eid in subordinate_ids], ["employee_id"])
+        users_df.index("employee_id", "date")
+        comments_df.index("subordinate_employee_id", "date", "superior_employee_id")
+        missing = Table.query(f"""
+            WITH completed AS (
+                SELECT *, ROW_NUMBER() OVER (PARTITION BY subordinate_employee_id, date ORDER BY rowid DESC) AS rank
+                FROM {comments_df.sql_name} WHERE superior_employee_id = ? AND date BETWEEN ? AND ?
             )
-        completed = comments_df.lazy().cast(pl.String).filter(
-            (pl.col("superior_employee_id") == employee_id)
-            & pl.col("date").is_between(pl.lit(range_start.isoformat()), pl.lit(range_end.isoformat()))
-        ).unique(subset=["subordinate_employee_id", "date"], keep="last").filter(
-            pl.col("comment").fill_null("").str.strip_chars() != ""
-        ).select(pl.col("subordinate_employee_id").alias("employee_id"), "date")
-        missing = candidates.join(
-            completed, on=["employee_id", "date"], how="anti"
-        ).collect()
-        summary["dates"] = missing.get_column("date").unique().sort().to_list()
-        counts = dict(missing.group_by("employee_id").len().iter_rows())
+            SELECT m.employee_id, d.date FROM {members.sql_name} m CROSS JOIN {days.sql_name} d
+            WHERE (NOT d.is_holiday OR EXISTS (
+                SELECT 1 FROM {users_df.sql_name} r
+                WHERE r.employee_id = m.employee_id AND r.date = d.date AND r.record_type = 'report'
+                  AND (strip_text(r.business_name) != '' OR strip_text(r.business_detail) != '')))
+              AND (? OR EXISTS (
+                SELECT 1 FROM {users_df.sql_name} r
+                WHERE r.employee_id = m.employee_id AND r.date = d.date AND r.record_type = 'report'
+                  AND (strip_text(r.business_name) != '' OR strip_text(r.business_detail) != '')))
+              AND NOT EXISTS (SELECT 1 FROM completed c
+                  WHERE c.subordinate_employee_id = m.employee_id AND c.date = d.date
+                    AND c.rank = 1 AND strip_text(c.comment) != '')
+            ORDER BY m.rowid, d.date
+        """, (employee_id, range_start.isoformat(), range_end.isoformat(),
+                self.settings.include_empty_report_days_in_missing_comments))
+        summary["dates"] = Table.query(f'SELECT DISTINCT date FROM {missing.sql_name} ORDER BY date').column_values("date")
+        counts = dict(Table.query(f'SELECT employee_id, COUNT(*) AS count FROM {missing.sql_name} GROUP BY employee_id').iter_rows())
         summary["member_counts"] = {eid: counts.get(eid, 0) for eid in subordinate_ids}
         return summary
 
@@ -1275,9 +1257,8 @@ class DailyReportRepository:
             ])
             authorized_replies = {
                 (superior_id, self._date_key(report_date))
-                for superior_id, report_date in existing_comments.filter(
-                    (pl.col("subordinate_employee_id") == employee_id)
-                    & (pl.col("comment").fill_null("").str.strip_chars() != "")
+                for superior_id, report_date in existing_comments.where(
+                    "subordinate_employee_id = ? AND strip_text(comment) != ''", (employee_id,)
                 ).select("superior_employee_id", "date").iter_rows()
             }
             if not requested_replies.issubset(authorized_replies):
@@ -1285,7 +1266,7 @@ class DailyReportRepository:
 
     def load_report_partition(
         self, path: Path, employee_id: str
-    ) -> pl.DataFrame:
+    ) -> Table:
         key = self._report_path_key(path)
         try:
             # 置換直後の別ファイルのstatを古い読み取り結果に結び付けない。
@@ -1319,7 +1300,7 @@ class DailyReportRepository:
             raise ReportFormatError(str(exc)) from exc
 
     @staticmethod
-    def _validate_rich_columns(frame: pl.DataFrame, fields: tuple[str, ...]) -> None:
+    def _validate_rich_columns(frame: Table, fields: tuple[str, ...]) -> None:
         for row in frame.select([column for field in fields for column in (field, RICH_FIELDS[field])]).iter_rows(named=True):
             for field in fields:
                 try:
@@ -1331,7 +1312,7 @@ class DailyReportRepository:
 
     def load_comment_partition(
         self, path: Path, allowed_employee_ids: set[str] | None
-    ) -> pl.DataFrame:
+    ) -> Table:
         if not path.exists():
             return self._empty_df(COMMENT_COLUMNS)
         frame = self._read_csv_frame(path)
@@ -1340,40 +1321,32 @@ class DailyReportRepository:
         except ValueError as exc:
             raise ReportFormatError(str(exc)) from exc
         if allowed_employee_ids is not None:
-            frame = frame.filter(pl.col("subordinate_employee_id").is_in(list(allowed_employee_ids)))
+            frame = frame.where_in("subordinate_employee_id", allowed_employee_ids)
         if self.defer_partition_normalization:
             return frame
         return frame
 
     def combine_report_partitions(
-        self, partitions: list[pl.DataFrame]
-    ) -> pl.DataFrame:
+        self, partitions: list[Table]
+    ) -> Table:
         return self._dedupe_normalized_frame(
-            pl.concat(partitions) if partitions else self._empty_df(USER_COLUMNS),
+            concat(partitions) if partitions else self._empty_df(USER_COLUMNS),
             USER_KEYS
         )
 
     def normalize_partitions(
-        self, partitions: dict[str, pl.DataFrame], columns: list[str], keys: list[str]
-    ) -> dict[str, pl.DataFrame]:
+        self, partitions: dict[str, Table], columns: list[str], keys: list[str]
+    ) -> dict[str, Table]:
         """Validated conversation CSVs already contain canonical strings and unique keys."""
         if columns in (USER_COLUMNS, COMMENT_COLUMNS):
             return partitions
-        nonempty = [frame.with_columns(pl.lit(path).alias("_partition"))
-                    for path, frame in partitions.items() if not frame.is_empty()]
-        if not nonempty:
-            return partitions
-        normalized = self._dedupe_frame(
-            pl.concat(nonempty), [*columns, "_partition"], [*keys, "_partition"]
-        )
-        grouped = normalized.partition_by("_partition", as_dict=True, include_key=False)
-        return {path: grouped.get((path,), self._empty_df(columns)) for path in partitions}
+        return {path: self._dedupe_frame(frame, columns, keys) for path, frame in partitions.items()}
 
     def combine_comment_partitions(
-        self, partitions: list[pl.DataFrame]
-    ) -> pl.DataFrame:
+        self, partitions: list[Table]
+    ) -> Table:
         return self._dedupe_normalized_frame(
-            pl.concat(partitions) if partitions else self._empty_df(COMMENT_COLUMNS),
+            concat(partitions) if partitions else self._empty_df(COMMENT_COLUMNS),
             COMMENT_KEYS,
         )
 
@@ -1384,8 +1357,8 @@ class DailyReportRepository:
         self,
         allowed_employee_ids: list[str],
         common: dict[str, list[dict[str, Any]]] | None = None,
-    ) -> pl.DataFrame:
-        partitions: list[pl.DataFrame] = []
+    ) -> Table:
+        partitions: list[Table] = []
         common = common or self.load_common()
         user_master = {
             str(row.get("employee_id", "")).strip(): row
@@ -1441,8 +1414,8 @@ class DailyReportRepository:
 
     def _load_all_comment_rows(
         self, allowed_employee_ids: list[str] | None = None
-    ) -> pl.DataFrame:
-        partitions: list[pl.DataFrame] = []
+    ) -> Table:
+        partitions: list[Table] = []
         comments_dir = self.storage_dir("comments")
         if not comments_dir.exists():
             self._record_load_warning(
@@ -1475,8 +1448,8 @@ class DailyReportRepository:
 
     def _build_rows(
         self,
-        users_df: pl.DataFrame,
-        comments_df: pl.DataFrame,
+        users_df: Table,
+        comments_df: Table,
         common: dict[str, list[dict[str, Any]]],
         employee_id: str,
         assigned_subordinate_ids: set[str],
@@ -1489,7 +1462,7 @@ class DailyReportRepository:
         return_frame: bool = False,
         global_order: list[str] | None = None,
         target_commenters: dict[str, list[str]] | None = None,
-    ) -> tuple[list[dict[str, Any]] | pl.DataFrame, date | None, date | None]:
+    ) -> tuple[list[dict[str, Any]] | Table, date | None, date | None]:
         conversations = conversation.conversation_index(users_df, comments_df)
         users_df = conversation.project_users(users_df)
         comments_df = conversation.project_comments(comments_df)
@@ -1534,105 +1507,92 @@ class DailyReportRepository:
         if default_start > default_end:
             default_start, default_end = default_end, default_start
 
-        date_filter = pl.col("date").is_between(pl.lit(default_start.isoformat()), pl.lit(default_end.isoformat()))
-        visible_source = users_df.lazy().cast(pl.String).filter(date_filter).collect()
+        visible_source = users_df.where("date BETWEEN ? AND ?", (default_start.isoformat(), default_end.isoformat()))
         original_targets = list(dict.fromkeys(eid for eid in target_employee_ids if eid))
-        # Retain last-known rows on a failed refresh, but do not synthesize
-        # editable blanks for those unavailable employees.
-        target_ids = list(dict.fromkeys([*original_targets, *visible_source.get_column("employee_id").to_list()]))
+        # Failed partitions retain old rows but must not synthesize editable blanks.
+        target_ids = list(dict.fromkeys([*original_targets, *visible_source.column_values("employee_id")]))
         if not target_ids:
-            return (pl.DataFrame() if return_frame else []), default_start, default_end
-        # Small role/calendar metadata is computed once, independently of report rows.
-        members = pl.DataFrame({
-            "employee_id": target_ids,
-            "display_name": [user_master.get(eid, {}).get("display_name") or eid for eid in target_ids],
-            "_member_order": list(range(len(target_ids))),
-            "can_edit_report": [eid == employee_id and self._user_can_input_own_report(user_master.get(eid, {})) for eid in target_ids],
-            "can_edit_my_comment": [eid in assigned_subordinate_ids for eid in target_ids],
-        })
-        dates = pl.date_range(default_start, default_end, eager=True)
-        calendar = pl.DataFrame({"_day": dates}).lazy().with_columns(
-            pl.col("_day").dt.to_string("%Y-%m-%d").alias("date"),
-            pl.col("_day").is_in(list(holiday_date_values)).alias("is_holiday"),
-            (pl.col("_day") == today).alias("is_today"),
-        )
-        reports = visible_source.lazy().filter(pl.col("record_type") == "report")
-        replies = visible_source.lazy().filter(pl.col("record_type") == "reply").select(
-            "employee_id", "date", pl.col("reply_to_employee_id").alias("superior_employee_id"), "reply_text", "reply_rich_text"
-        )
-        comments = comments_df.lazy().cast(pl.String).filter(date_filter & pl.col("subordinate_employee_id").is_in(target_ids))
-        my_comments = comments.filter(pl.col("superior_employee_id") == employee_id).select(
-            pl.col("subordinate_employee_id").alias("employee_id"), "date",
-            pl.col("comment").alias("_my_comment"),
-        )
-        rows = members.lazy().join(calendar, how="cross").join(
-            reports.select("employee_id", "date", "business_name", "business_detail", "business_name_rich_text", "business_detail_rich_text"),
-            on=["employee_id", "date"], how="left",
-        ).join(visible_source.lazy().select("employee_id", "date").unique().with_columns(pl.lit(True).alias("_present")),
-               on=["employee_id", "date"], how="left"
-        ).filter(pl.col("employee_id").is_in(original_targets) | pl.col("_present").fill_null(False)).join(my_comments, on=["employee_id", "date"], how="left").with_columns(
-            pl.col("business_name", "business_detail").fill_null(""),
-            pl.col("business_name_rich_text", "business_detail_rich_text").fill_null(EMPTY_RICH_TEXT),
-            (pl.lit("") if employee_id in failed_comment_ids else pl.col("_my_comment").fill_null("")).alias("_my_comment"),
-        )
-        needs_review = (
-            pl.col("can_edit_my_comment")
-            & (pl.col("_day") <= today)
-            & (pl.col("_my_comment").str.strip_chars() == "")
-            & ((~pl.col("is_holiday"))
-               | (pl.col("business_name").str.strip_chars() != "")
-               | (pl.col("business_detail").str.strip_chars() != ""))
-            & pl.lit(employee_id not in failed_comment_ids)
-            & ((pl.col("_day") < today) | pl.lit(self.settings.include_today_in_missing_comments))
-        )
-        rows = rows.with_columns(needs_review.alias("needs_review"), pl.lit("").alias("holiday_description")).collect()
-        comment_columns = ["superior_employee_id", "superior_name", "superior_affiliation_type", "comment", "comment_rich_text", "reply_text", "reply_rich_text", "editable",
-                           "applies", "available", "load_failed", "rank"]
+            return (Table() if return_frame else []), default_start, default_end
+        members = Table([{
+            "employee_id": eid,
+            "display_name": user_master.get(eid, {}).get("display_name") or eid,
+            "member_order": rank,
+            "original_target": eid in original_targets,
+            "can_edit_report": eid == employee_id and self._user_can_input_own_report(user_master.get(eid, {})),
+            "can_edit_my_comment": eid in assigned_subordinate_ids,
+        } for rank, eid in enumerate(target_ids)])
+        calendar = Table([{
+            "date": (default_start + timedelta(days=n)).isoformat(),
+            "is_holiday": default_start + timedelta(days=n) in holiday_date_values,
+            "is_today": default_start + timedelta(days=n) == today,
+        } for n in range((default_end - default_start).days + 1)])
+        visible_source.index("employee_id", "date", "record_type")
+        comments_df.index("subordinate_employee_id", "date", "superior_employee_id")
+        bool_columns = ("is_holiday", "is_today", "can_edit_report", "can_edit_my_comment", "needs_review")
+        rows = Table.query(f"""
+            SELECT m.employee_id, m.display_name, d.date,
+                COALESCE(r.business_name, '') AS business_name,
+                COALESCE(r.business_detail, '') AS business_detail,
+                COALESCE(r.business_name_rich_text, :empty) AS business_name_rich_text,
+                COALESCE(r.business_detail_rich_text, :empty) AS business_detail_rich_text,
+                d.is_holiday, '' AS holiday_description, d.is_today,
+                m.can_edit_report, m.can_edit_my_comment,
+                (m.can_edit_my_comment AND d.date <= :today
+                    AND strip_text(c.comment) = '' AND :comment_available
+                    AND (NOT d.is_holiday OR strip_text(r.business_name) != '' OR strip_text(r.business_detail) != '')
+                    AND (d.date < :today OR :include_today)) AS needs_review
+            FROM {members.sql_name} m CROSS JOIN {calendar.sql_name} d
+            LEFT JOIN {visible_source.sql_name} r
+                ON r.employee_id = m.employee_id AND r.date = d.date AND r.record_type = 'report'
+            LEFT JOIN {comments_df.sql_name} c
+                ON c.subordinate_employee_id = m.employee_id AND c.date = d.date AND c.superior_employee_id = :viewer
+            WHERE m.original_target OR EXISTS (
+                SELECT 1 FROM {visible_source.sql_name} p WHERE p.employee_id = m.employee_id AND p.date = d.date)
+            ORDER BY m.member_order, d.date
+        """, {"empty": EMPTY_RICH_TEXT, "today": today.isoformat(), "viewer": employee_id,
+                "comment_available": employee_id not in failed_comment_ids,
+                "include_today": self.settings.include_today_in_missing_comments}, bool_columns=bool_columns)
+        cells_by_key = {}
         if superior_ids:
-            superiors = pl.DataFrame({
-                "superior_employee_id": superior_ids,
-                "superior_name": [user_master.get(eid, {}).get("display_name") or eid for eid in superior_ids],
-                "superior_affiliation_type": [user_master.get(eid, {}).get("affiliation_type", "") for eid in superior_ids],
-                "rank": list(range(len(superior_ids))),
-                "load_failed": [eid in failed_comment_ids for eid in superior_ids],
-            })
-            assignments = pl.DataFrame(
-                [(eid, sid, True) for eid in target_ids for sid in target_commenters.get(eid, [])],
-                schema={"employee_id": pl.String, "superior_employee_id": pl.String, "applies": pl.Boolean}, orient="row",
-            )
-            cell_keys = ["employee_id", "date", "superior_employee_id"]
-            cells = rows.lazy().select("employee_id", "date", "can_edit_my_comment").join(
-                superiors.lazy(), how="cross"
-            ).join(assignments.lazy(), on=["employee_id", "superior_employee_id"], how="left").join(
-                comments.select(pl.col("subordinate_employee_id").alias("employee_id"), "date", "superior_employee_id", "comment", "comment_rich_text"),
-                on=cell_keys, how="left",
-            ).join(replies, on=cell_keys, how="left").with_columns(
-                pl.col("applies").fill_null(False),
-                (~pl.col("load_failed")).alias("available"),
-            ).with_columns(
-                pl.when(pl.col("applies") & pl.col("available")).then(pl.col("comment").fill_null("")).otherwise(pl.lit("")).alias("comment"),
-                pl.when(pl.col("applies") & pl.col("available")).then(pl.col("reply_text").fill_null("")).otherwise(pl.lit("")).alias("reply_text"),
-                pl.when(pl.col("applies") & pl.col("available")).then(pl.col("comment_rich_text").fill_null(EMPTY_RICH_TEXT)).otherwise(pl.lit(EMPTY_RICH_TEXT)).alias("comment_rich_text"),
-                pl.when(pl.col("applies") & pl.col("available")).then(pl.col("reply_rich_text").fill_null(EMPTY_RICH_TEXT)).otherwise(pl.lit(EMPTY_RICH_TEXT)).alias("reply_rich_text"),
-                (pl.col("applies") & pl.col("available") & pl.col("can_edit_my_comment")
-                 & (pl.col("superior_employee_id") == employee_id)).alias("editable"),
-            ).group_by("employee_id", "date").agg(pl.struct(comment_columns).sort_by("rank").alias("comments"))
-            rows = rows.lazy().join(cells, on=["employee_id", "date"], how="left").collect()
-        output_columns = ["employee_id", "display_name", "date", "business_name", "business_detail", "business_name_rich_text", "business_detail_rich_text", "is_holiday",
-                          "holiday_description", "is_today", "can_edit_report", "can_edit_my_comment", "needs_review"]
-        if superior_ids:
-            output_columns.append("comments")
-        result = rows.sort("_member_order", "date").select(output_columns)
-        if not superior_ids:
-            result = result.with_columns(pl.lit([]).alias("comments"))
-        # Only return conversations for visible, available assignment cells.
-        payloads = []
-        for row in result.iter_rows(named=True):
-            payloads.append(json.dumps({cell['superior_employee_id']: conversations.get(
-                (row['employee_id'], row['date'], cell['superior_employee_id']), [])
-                for cell in row['comments'] if cell['applies'] and cell['available']}, ensure_ascii=False))
-        result = result.with_columns(pl.Series('conversation_data', payloads, dtype=pl.String))
-        return (result if return_frame else result.to_dicts()), default_start, default_end
+            superiors = Table([{
+                "superior_employee_id": sid,
+                "superior_name": user_master.get(sid, {}).get("display_name") or sid,
+                "superior_affiliation_type": user_master.get(sid, {}).get("affiliation_type", ""),
+                "rank": rank, "load_failed": sid in failed_comment_ids,
+            } for rank, sid in enumerate(superior_ids)])
+            assignments = Table([{"employee_id": eid, "superior_employee_id": sid}
+                for eid in target_ids for sid in target_commenters.get(eid, [])],
+                ["employee_id", "superior_employee_id"])
+            assignments.index("employee_id", "superior_employee_id")
+            cells = Table.query(f"""
+                SELECT r.employee_id, r.date, s.superior_employee_id, s.superior_name,
+                    s.superior_affiliation_type,
+                    CASE WHEN a.employee_id IS NOT NULL AND NOT s.load_failed THEN COALESCE(c.comment, '') ELSE '' END AS comment,
+                    CASE WHEN a.employee_id IS NOT NULL AND NOT s.load_failed THEN COALESCE(c.comment_rich_text, :empty) ELSE :empty END AS comment_rich_text,
+                    CASE WHEN a.employee_id IS NOT NULL AND NOT s.load_failed THEN COALESCE(p.reply_text, '') ELSE '' END AS reply_text,
+                    CASE WHEN a.employee_id IS NOT NULL AND NOT s.load_failed THEN COALESCE(p.reply_rich_text, :empty) ELSE :empty END AS reply_rich_text,
+                    (a.employee_id IS NOT NULL AND NOT s.load_failed AND r.can_edit_my_comment AND s.superior_employee_id = :viewer) AS editable,
+                    (a.employee_id IS NOT NULL) AS applies, NOT s.load_failed AS available, s.load_failed, s.rank
+                FROM {rows.sql_name} r CROSS JOIN {superiors.sql_name} s
+                LEFT JOIN {assignments.sql_name} a ON a.employee_id = r.employee_id AND a.superior_employee_id = s.superior_employee_id
+                LEFT JOIN {comments_df.sql_name} c ON c.subordinate_employee_id = r.employee_id AND c.date = r.date AND c.superior_employee_id = s.superior_employee_id
+                LEFT JOIN {visible_source.sql_name} p ON p.employee_id = r.employee_id AND p.date = r.date
+                    AND p.reply_to_employee_id = s.superior_employee_id AND p.record_type = 'reply'
+                ORDER BY r.rowid, s.rank
+            """, {"empty": EMPTY_RICH_TEXT, "viewer": employee_id},
+                bool_columns=("editable", "applies", "available", "load_failed"))
+            for cell in cells.iter_rows(named=True):
+                key = (cell.pop("employee_id"), cell.pop("date"))
+                cells_by_key.setdefault(key, []).append(cell)
+        # Nested UI payloads stay Python objects at the API boundary.
+        result_rows = rows.to_dicts()
+        for row in result_rows:
+            row["comments"] = cells_by_key.get((row["employee_id"], row["date"]), [])
+            row["conversation_data"] = json.dumps({cell["superior_employee_id"]: conversations.get(
+                (row["employee_id"], row["date"], cell["superior_employee_id"]), [])
+                for cell in row["comments"] if cell["applies"] and cell["available"]}, ensure_ascii=False)
+        result = Table(result_rows, [*rows.columns, "comments", "conversation_data"]) if return_frame else result_rows
+        return result, default_start, default_end
 
     def _report_directory_for_employee(
         self,
@@ -1657,22 +1617,25 @@ class DailyReportRepository:
 
     @staticmethod
     def _merge_partition_updates(
-        existing: pl.DataFrame, changes: pl.DataFrame, keys: list[str]
-    ) -> pl.DataFrame:
+        existing: Table, changes: Table, keys: list[str]
+    ) -> Table:
         """変更行だけを置換し、既存キーの順序と未変更列を保持する。"""
         if changes.is_empty():
             return existing
-        return existing.join(
-            changes, on=keys, how="full", coalesce=True,
-            suffix="_new", maintain_order="left_right",
-        ).select([
-            pl.col(column) if column in keys else
-            pl.coalesce(pl.col(f"{column}_new"), pl.col(column)).alias(column)
-            for column in existing.columns
-        ])
+        condition = " AND ".join(f'e.{quote(k)} IS c.{quote(k)}' for k in keys)
+        selections = ', '.join(f'e.{quote(c)}' if c in keys else
+                               f'COALESCE(c.{quote(c)}, e.{quote(c)}) AS {quote(c)}' for c in existing.columns)
+        new_columns = ', '.join(f'c.{quote(c)}' for c in existing.columns)
+        return Table.query(f"""SELECT {', '.join(map(quote, existing.columns))} FROM (
+            SELECT {selections}, 0 AS _part, e.rowid AS _input
+            FROM {existing.sql_name} e LEFT JOIN {changes.sql_name} c ON {condition}
+            UNION ALL
+            SELECT {new_columns}, 1 AS _part, c.rowid AS _input
+            FROM {changes.sql_name} c WHERE NOT EXISTS (SELECT 1 FROM {existing.sql_name} e WHERE {condition})
+        ) ORDER BY _part, _input""")
 
     def _write_csv_atomically(
-        self, df: pl.DataFrame, target_path: Path, backup_group: str
+        self, df: Table, target_path: Path, backup_group: str
     ) -> str:
         """Write a CSV completely, then replace the destination in one operation."""
         return self._write_csv_frames_atomically([(df, target_path)], backup_group)[target_path]
@@ -1706,7 +1669,7 @@ class DailyReportRepository:
 
     def _write_csv_frames_atomically(
         self,
-        frames: list[tuple[pl.DataFrame, Path]],
+        frames: list[tuple[Table, Path]],
         backup_group: str,
     ) -> dict[Path, str]:
         revisions: dict[Path, str] = {}
@@ -1846,84 +1809,29 @@ class DailyReportRepository:
                 # バックアップ整理の失敗で、本体CSVの保存成功を失敗扱いにしない。
                 continue
 
-    def _read_csv_or_empty(self, path: Path, columns: list[str]) -> pl.DataFrame:
+    def _read_csv_or_empty(self, path: Path, columns: list[str]) -> Table:
         if not path.exists():
             return self._empty_df(columns)
         return self._ensure_columns(self._read_csv_frame(path), columns)
 
-    def _empty_df(self, columns: list[str]) -> pl.DataFrame:
-        return pl.DataFrame(schema={column: pl.String for column in columns})
+    def _empty_df(self, columns: list[str]) -> Table:
+        return Table(columns=columns)
 
-    def _ensure_columns(self, df: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
-        if df.columns == columns:
-            return df
-        for column in columns:
-            if column not in df.columns:
-                df = df.with_columns(
-                    pl.lit("").alias(column)
-                )
-        return df.select(columns)
+    def _ensure_columns(self, df: Table, columns: list[str]) -> Table:
+        return df if df.columns == columns else df.ensure_columns(columns)
 
-    def _dedupe_frame(
-        self, frame: pl.DataFrame, columns: list[str], keys: list[str]
-    ) -> pl.DataFrame:
-        """Normalize CSV columns without materializing Python rows.
-
-        Preserve wall-clock timestamps and last-input-row tie breaking used by
-        the CSV writer. Strings at this boundary keep the on-disk/save contract;
-        query dates are converted to Date inside the columnar query.
-        """
-        if frame.is_empty():
-            return self._empty_df(columns)
-        frame = self._ensure_columns(frame, columns)
-        timestamp = pl.col("updated_at").cast(pl.String).str.replace(r"(?:Z|[+-]\d{2}:?\d{2})$", "")
-        parsed = pl.coalesce(
-            timestamp.str.to_datetime("%Y-%m-%dT%H:%M:%S%.f", strict=False),
-            timestamp.str.to_datetime("%Y-%m-%d %H:%M:%S%.f", strict=False),
-            timestamp.str.to_datetime("%Y-%m-%d", strict=False),
-        )
-        normalized = (
-            frame.lazy().with_columns(
-                pl.col("date").cast(pl.String).str.slice(0, 10)
-                .str.to_date("%Y-%m-%d", strict=False).dt.to_string("%Y-%m-%d").fill_null(""),
-                parsed.alias("_updated"),
-            ).with_columns(
-                pl.when(pl.col("_updated").dt.microsecond() == 0)
-                .then(pl.col("_updated").dt.to_string("%Y-%m-%dT%H:%M:%S"))
-                .otherwise(pl.col("_updated").dt.to_string("%Y-%m-%dT%H:%M:%S%.6f"))
-                .alias("updated_at"),
-            ).select(columns).collect()
-        )
-        # Preserve datetime.fromisoformat's legacy acceptance of uncommon ISO
-        # forms. Only distinct nonstandard values enter Python, never CSV rows.
-        if normalized.get_column("updated_at").null_count():
-            values = frame.filter(normalized.get_column("updated_at").is_null()).get_column("updated_at").unique()
-            fallback = self.now_jst()
-            replacements = {value: (self._to_datetime(value) or fallback).isoformat() for value in values}
-            repaired = frame.get_column("updated_at").replace_strict(replacements, default=None)
-            normalized = normalized.with_columns(pl.col("updated_at").fill_null(repaired))
-        invalid_dates = normalized.get_column("date") == ""
-        if invalid_dates.any():
-            values = frame.filter(invalid_dates).get_column("date").unique()
-            replacements = {value: self._date_key(value) for value in values}
-            repaired = frame.get_column("date").replace_strict(replacements, default=None)
-            normalized = normalized.with_columns(
-                pl.when(pl.col("date") == "").then(repaired).otherwise(pl.col("date")).alias("date")
-            )
-        return self._dedupe_normalized_frame(normalized, keys)
+    def _dedupe_frame(self, frame: Table, columns: list[str], keys: list[str]) -> Table:
+        """従来の日付補正を行い、SQLで最新行と同時刻の後勝ちを選ぶ。"""
+        fallback = self.now_jst()
+        rows = self._ensure_columns(frame, columns).to_dicts()
+        for row in rows:
+            row["date"] = self._date_key(row["date"])
+            row["updated_at"] = (self._to_datetime(row["updated_at"]) or fallback).isoformat()
+        return self._dedupe_normalized_frame(Table(rows, columns), keys)
 
     @staticmethod
-    def _dedupe_normalized_frame(frame: pl.DataFrame, keys: list[str]) -> pl.DataFrame:
-        # Most CSVs already have unique keys; avoid sorts/window work for them.
-        if frame.is_empty() or not frame.select(keys).is_duplicated().any():
-            return frame
-        return (
-            frame.lazy().with_row_index("_input_order")
-            .with_columns(pl.col("_input_order").min().over(keys).alias("_key_order"))
-            .sort(["updated_at", "_input_order"])
-            .unique(subset=keys, keep="last")
-            .sort("_key_order").select(frame.columns).collect()
-        )
+    def _dedupe_normalized_frame(frame: Table, keys: list[str]) -> Table:
+        return frame.deduplicate(keys)
 
     def _to_date(self, value: Any) -> date | None:
         if isinstance(value, date) and not isinstance(value, datetime):
