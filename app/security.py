@@ -146,7 +146,7 @@ def validate_save_request(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], str]:
     """日報・返信・上司コメントを独立した更新として検証する。"""
     source = require_request_mapping(payload)
-    _reject_unknown_keys(source, {"user_updates", "reply_updates", "comment_updates", "report_revision", "view_request"})
+    _reject_unknown_keys(source, {"user_updates", "reply_updates", "comment_updates", "report_revision", "view_request", "conversation_updates"})
     if "view_request" in source:
         validate_load_request(source["view_request"])
     user_updates = _validate_update_list(

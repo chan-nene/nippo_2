@@ -477,6 +477,8 @@ class DailyReportApi:
     def save_updates(self, payload: Any) -> dict[str, Any]:
         try:
             user_updates, reply_updates, comment_updates, report_revision = validate_save_request(payload)
+            from app.conversations import validate_operations
+            conversation_updates = validate_operations(payload.get("conversation_updates", []))
             if not self._storage_ready:
                 return self._storage_unavailable_response()
             data_cache = self._get_data_cache()
@@ -497,6 +499,7 @@ class DailyReportApi:
                 common=common,
                 reply_updates=reply_updates,
                 report_revision=report_revision,
+                conversation_updates=conversation_updates,
             )
             report_cache = self._cache_partition_result(result.get("user"))
             comment_cache = self._cache_partition_result(result.get("comment"))
@@ -568,6 +571,7 @@ class DailyReportApi:
             review_patch = None
             if (
                 result.get("comment", {}).get("saved") is True
+                and not conversation_updates
                 and not cache_sync_failed
                 and payload.get("view_request") is not None
             ):

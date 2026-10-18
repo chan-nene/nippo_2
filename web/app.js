@@ -48,6 +48,7 @@ const state = {
   reportRevision: "",
   reportChanges: new Map(),
   commentChanges: new Map(),
+  conversationChanges: new Map(),
   startDate: "",
   activePeriodPreset: "default",
   periodBeforeMissing: null,
@@ -430,6 +431,7 @@ function bindEvents() {
 
   initializePeriodPresetControl();
 
+  setupConversationUi();
   $("showHolidays")?.addEventListener("change", () => {
     finishEditing();
     state.showHolidays = $("showHolidays").checked;

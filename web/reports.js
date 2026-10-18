@@ -6,19 +6,19 @@ const INCLUDE_SELF_IN_MEMBER_FILTERS = false;
 let reportTableRenderSession = null;
 
 const TABLE_COLUMN_WIDTH_PROFILES = Object.freeze({
-  compact: { user: 88, date: 70, name: 255, detail: 450, comment: 176 },
-  standard: { user: 96, date: 78, name: 285, detail: 525, comment: 176 },
-  medium: { user: 104, date: 84, name: 308, detail: 585, comment: 194 },
-  large: { user: 112, date: 92, name: 330, detail: 630, comment: 212 },
-  xlarge: { user: 124, date: 102, name: 360, detail: 690, comment: 230 },
+  compact: { user: 88, date: 96, name: 255, detail: 450, comment: 176 },
+  standard: { user: 96, date: 104, name: 285, detail: 525, comment: 176 },
+  medium: { user: 104, date: 112, name: 308, detail: 585, comment: 194 },
+  large: { user: 112, date: 120, name: 330, detail: 630, comment: 212 },
+  xlarge: { user: 124, date: 132, name: 360, detail: 690, comment: 230 },
 });
 const TABLE_COLUMN_MIN_WIDTH_PROFILES = Object.freeze({
   // 折り返しを許容して画面内に収める。40pxは列幅設定の保存可能な下限。
-  compact: { user: 88, date: 70, name: 40, detail: 40, comment: 40 },
-  standard: { user: 96, date: 78, name: 40, detail: 40, comment: 40 },
-  medium: { user: 104, date: 84, name: 40, detail: 40, comment: 40 },
-  large: { user: 112, date: 92, name: 40, detail: 40, comment: 40 },
-  xlarge: { user: 124, date: 102, name: 40, detail: 40, comment: 40 },
+  compact: { user: 40, date: 40, name: 40, detail: 40, comment: 40 },
+  standard: { user: 40, date: 40, name: 40, detail: 40, comment: 40 },
+  medium: { user: 40, date: 40, name: 40, detail: 40, comment: 40 },
+  large: { user: 40, date: 40, name: 40, detail: 40, comment: 40 },
+  xlarge: { user: 40, date: 40, name: 40, detail: 40, comment: 40 },
 });
 const TABLE_COLUMN_MAX_WIDTHS = Object.freeze({
   user: 360,
@@ -242,7 +242,7 @@ function updateSubordinateFilterUi() {
 
 function getDirtyCounts() {
   const reports = state.reportChanges.size;
-  const comments = state.commentChanges.size;
+  const comments = state.commentChanges.size + (state.conversationChanges?.size || 0);
   return {
     reports,
     comments,
@@ -817,6 +817,7 @@ async function refreshData() {
 function discardDirtyEdits() {
   state.reportChanges.clear();
   state.commentChanges.clear();
+  state.conversationChanges?.clear();
   syncChrome();
 }
 
@@ -988,6 +989,7 @@ async function loadData({
     ? result.data.my_rank
     : 9999;
   state.rows = Array.isArray(result.data.rows) ? result.data.rows : [];
+  hydrateConversations();
   // 下書きを引き継ぐ再表示では、その下書きの基準となった版も維持する。
   if (!preserveDirty || state.reportChanges.size === 0) {
     state.reportRevision = result.data.report_revision || "";
@@ -1129,6 +1131,7 @@ function setMemberFilterButtonLabel(button, text) {
 }
 
 function reapplyDirtyEditsToRows() {
+  reapplyConversationDrafts();
   if (state.reportChanges.size === 0 && state.commentChanges.size === 0) return;
 
   const rowsByKey = new Map(
@@ -1875,10 +1878,7 @@ function getReplyKey(row, cell) {
 }
 
 function renderCommentCell(row, cell, rowIndex, commentIndex) {
-  const context = createCommentRenderContext(row, cell, rowIndex, commentIndex);
-  return context.canEditComment
-    ? renderBossCommentCell(context)
-    : renderDailyCommentCell(context);
+  return renderConversationCell(row, cell, rowIndex, commentIndex);
 }
 
 function createCommentRenderContext(row, cell, rowIndex, commentIndex) {
@@ -2274,7 +2274,7 @@ function handleColumnResizeKeydown(event, handle) {
   return true;
 }
 
-// 名前・日付を最小幅にし、残りを業務名:業務詳細:各上司=1.5:2.5:1で配分する。
+// 名前・日付は標準幅を優先し、残りを業務名:業務詳細:各上司=1.5:2.5:1で配分する。
 function fitColumnWidthsToViewport() {
   const scroll = document.querySelector("#tableWrap .table-scroll");
   if (!scroll || scroll.clientWidth === 0) return;
@@ -2284,11 +2284,18 @@ function fitColumnWidthsToViewport() {
   const tableStyle = getComputedStyle(scroll.querySelector("table"));
   const borderWidth = parseFloat(tableStyle.borderLeftWidth) + parseFloat(tableStyle.borderRightWidth);
   let remaining = Math.floor(scroll.clientWidth - borderWidth);
+  // Manual drag limits must not become the preferred widths for automatic fitting.
+  const defaults = TABLE_COLUMN_WIDTH_PROFILES[state.fontSize];
+  const fixed = columns.filter(col => col.dataset.columnKind === 'user');
+  // Automatic fitting keeps the full date and weekday on one line. Manual limits stay at 40px.
+  const minimumTotal = columns.reduce((sum, col) => sum + (col.dataset.columnKind === "date" ? defaults.date : minimums[col.dataset.columnKind]), 0);
+  const preferredExtra = fixed.reduce((sum, col) => sum + defaults[col.dataset.columnKind] - minimums[col.dataset.columnKind], 0);
+  const fixedScale = preferredExtra ? Math.min(1, Math.max(0, (remaining - minimumTotal) / preferredExtra)) : 0;
   let flexible = [];
   for (const column of columns) {
     const { columnId, columnKind } = column.dataset;
     if (columnKind === "user" || columnKind === "date") {
-      remaining -= setTableColumnWidth(columnId, columnKind, minimums[columnKind]);
+      remaining -= setTableColumnWidth(columnId, columnKind, columnKind === "date" ? defaults.date : minimums[columnKind] + Math.floor((defaults[columnKind] - minimums[columnKind]) * fixedScale));
     } else {
       const weight = columnKind === "detail" ? 2.5 : columnKind === "name" ? 1.5 : 1;
       flexible.push({ id: columnId, kind: columnKind, weight });
@@ -2328,10 +2335,14 @@ function fitColumnWidthsToViewport() {
 function resetColumnWidths() {
   state.columnWidths = {};
   applyColumnWidthsToRenderedTable();
+  const scroll = document.querySelector("#tableWrap .table-scroll");
+  if (scroll) scroll.scrollLeft = 0;
   persistUiState();
 }
 
 function handleTableClick(event) {
+  const conversationButton=event.target.closest("[data-conversation-action]");
+  if(conversationButton) {handleConversationAction(conversationButton);return;}
   if (event.target.closest(".column-resize-handle")) return;
   const signComment = event.target.closest('[data-action="sign-comment"]');
   if (signComment) {
@@ -2412,6 +2423,7 @@ function getBossCommentTarget(button) {
 }
 
 function getCellRichText(kind, rowIndex, commentIndex, field) {
+  if(kind === "message") return conversationMessage(rowIndex,commentIndex,field)?.message_rich_text;
   const row = state.rows[Number(rowIndex)];
   const cell = row?.comments?.[Number(commentIndex)];
   return kind === "report" ? row?.[RICH_FIELD_NAMES[field]]
@@ -2466,7 +2478,7 @@ function getEditableTargetFromEvent(event) {
   const cell = event.target.closest("td.name-col, td.detail-col, td.comment-col");
   if (!(cell instanceof HTMLElement)) return null;
 
-  const cellTarget = cell.querySelector(':scope > .editable-content, :scope > .comment-stack > .editable-content[data-kind="comment"]');
+  const cellTarget = cell.querySelector(':scope > .editable-content, :scope > .comment-stack > .editable-content[data-kind="comment"], :scope > .comment-stack > .conversation-initial > .editable-content');
   return cellTarget instanceof HTMLElement ? cellTarget : null;
 }
 
@@ -2480,14 +2492,18 @@ function startEditingTarget(target, { preventScroll = false, pointer = false } =
   const reportChange = row
     ? state.reportChanges.get(getReportRowKey(row))
     : null;
+  const message=target.dataset.kind === "message" ? conversationMessage(target.dataset.row,target.dataset.comment,target.dataset.field) : null;
+  const messageOp=message ? messageOperation(row,commentCell,message,message.is_new?"create":"edit") : null;
+  const messageDraftKey=messageOp ? conversationDraftKey(messageOp) : "";
   const commentKey = row && commentCell ? getReplyKey(row, commentCell) : "";
   editingSnapshot = {
+    message, messageOriginal:message ? {...message} : null, messageDraftKey, messageDraft:state.conversationChanges?.get(messageDraftKey),
     kind: target.dataset.kind,
     row,
     field: target.dataset.field || "",
     commentCell,
     originalValue:
-      target.dataset.kind === "report"
+      message ? message.message_text : target.dataset.kind === "report"
         ? normalizeCellValue(row?.[target.dataset.field])
         : target.dataset.kind === "reply"
           ? normalizeCellValue(commentCell?.reply_text)
@@ -2501,9 +2517,9 @@ function startEditingTarget(target, { preventScroll = false, pointer = false } =
     elementDirty: target.classList.contains("is-dirty"),
     cellDirty: Boolean(target.closest("td")?.classList.contains("is-dirty-cell")),
     elementHidden: target.classList.contains("hidden"),
-    actionsHidden: Boolean(target.parentElement?.querySelector(".boss-comment-actions")?.classList.contains("hidden")),
+    actionsHidden: Boolean(target.closest("td")?.querySelector(".boss-comment-actions")?.classList.contains("hidden")),
   };
-  const actions = target.parentElement?.querySelector(".boss-comment-actions");
+  const actions = target.closest("td")?.querySelector(".boss-comment-actions");
   actions?.classList.add("hidden");
   target.classList.remove("hidden");
   currentEditingElement = target;
@@ -2518,7 +2534,14 @@ function startEditingTarget(target, { preventScroll = false, pointer = false } =
     minHeight,
     onChange: (text, document) => {
       const row = state.rows[Number(target.dataset.row)];
-      if (target.dataset.kind === "report") {
+      if (target.dataset.kind === "message") {
+        const cell=row.comments[Number(target.dataset.comment)];
+        recordMessageChange(row,cell,message,text,document);
+        target.closest("td")?.querySelector(".boss-comment-actions")?.classList.toggle("hidden",Boolean(text.trim()));
+        const dirty = state.conversationChanges.has(conversationDraftKey(messageOperation(row,cell,message,message.is_new?'create':'edit')));
+        target.closest(".conversation-card")?.classList.toggle("is-dirty", dirty);
+        target.classList.toggle("is-dirty", dirty);
+      } else if (target.dataset.kind === "report") {
         recordReportFieldChange(row,target.dataset.field,text,document);
         markReportFieldDirtyUi(target.dataset.row,target.dataset.field);
       } else {
@@ -2542,6 +2565,13 @@ function cancelEditing() {
   const snapshot = editingSnapshot;
   activeRichEditor?.destroy();
   activeRichEditor = null;
+  if (snapshot?.message) {
+    Object.assign(snapshot.message,snapshot.messageOriginal);
+    if(snapshot.messageDraft)state.conversationChanges.set(snapshot.messageDraftKey,snapshot.messageDraft);
+    else state.conversationChanges.delete(snapshot.messageDraftKey);
+    syncConversationInitial(snapshot.commentCell);
+    editingElement.closest(".conversation-card")?.classList.toggle("is-dirty", Boolean(snapshot.messageDraft));
+  }
   if (snapshot?.row) {
     if (snapshot.kind === "report") { snapshot.row[snapshot.field] = snapshot.originalValue; snapshot.row[RICH_FIELD_NAMES[snapshot.field]] = snapshot.originalRich; }
     if (snapshot.kind === "reply" && snapshot.commentCell) { snapshot.commentCell.reply_text = snapshot.originalValue; snapshot.commentCell.reply_rich_text = snapshot.originalRich; }
@@ -2562,7 +2592,7 @@ function cancelEditing() {
   editingElement.classList.toggle("is-dirty", Boolean(snapshot?.elementDirty));
   editingElement.closest("td")?.classList.toggle("is-dirty-cell", Boolean(snapshot?.cellDirty));
   editingElement.classList.toggle("hidden", Boolean(snapshot?.elementHidden));
-  editingElement.parentElement?.querySelector(".boss-comment-actions")?.classList.toggle(
+  editingElement.closest("td")?.querySelector(".boss-comment-actions")?.classList.toggle(
     "hidden",
     Boolean(snapshot?.actionsHidden),
   );
@@ -2629,7 +2659,7 @@ function finishEditing() {
   activeRichEditor?.destroy();
   activeRichEditor = null;
   const row=state.rows[Number(data.row)],cell=row?.comments?.[Number(data.comment)];
-  const text = data.kind === "report" ? row?.[data.field] : data.kind === "reply" ? cell?.reply_text : cell?.comment;
+  const text = data.kind === "message" ? conversationMessage(data.row,data.comment,data.field)?.message_text : data.kind === "report" ? row?.[data.field] : data.kind === "reply" ? cell?.reply_text : cell?.comment;
   const rich=getCellRichText(data.kind,data.row,data.comment,data.field);
   element.innerHTML = isEmpty(text) && !element.classList.contains("empty-icon-hidden")
     ? renderEmptyEditableIcon() : window.NippoRichText.render(rich,text);
@@ -2996,7 +3026,8 @@ async function saveUpdates() {
   const commentEntries = Array.from(state.commentChanges.entries()).map(
     ([key, change]) => createCommentSaveEntry(key, change),
   );
-  if (!reportEntries.length && !commentEntries.length) {
+  const conversationEntries=Array.from(state.conversationChanges?.entries() || []).map(([key,op])=>({key,op:{...op}}));
+  if (!reportEntries.length && !commentEntries.length && !conversationEntries.length) {
     syncChrome();
     return false;
   }
@@ -3005,6 +3036,7 @@ async function saveUpdates() {
   let result;
   try {
     result = await window.pywebview.api.save_updates({
+      conversation_updates: conversationEntries.map(entry=>entry.op),
       user_updates: reportEntries.map(({ update }) => update).filter(Boolean),
       reply_updates: reportEntries.flatMap(({ replyUpdates }) => replyUpdates),
       report_revision: state.reportRevision,
@@ -3024,18 +3056,33 @@ async function saveUpdates() {
     return false;
   }
 
+  const conversationUser=conversationEntries.some(({op})=>op.subordinate_employee_id===state.employeeId);
+  const conversationComment=conversationEntries.some(({op})=>op.superior_employee_id===state.employeeId);
   const userSaved =
-    reportEntries.length === 0 || result?.result?.user?.saved === true;
+    (reportEntries.length === 0 && !conversationUser) || result?.result?.user?.saved === true;
   const commentSaved =
-    commentEntries.length === 0 || result?.result?.comment?.saved === true;
-  const reportChangesSaved = reportEntries.length > 0 && userSaved;
+    (commentEntries.length === 0 && !conversationComment) || result?.result?.comment?.saved === true;
+  const reportChangesSaved = (reportEntries.length > 0 || conversationUser) && userSaved;
   if (reportChangesSaved) state.reportRevision = result.result.user.revision;
-  const commentChangesSaved = commentEntries.length > 0 && commentSaved;
+  const commentChangesSaved = (commentEntries.length > 0 || conversationComment) && commentSaved;
   const anySaved = reportChangesSaved || commentChangesSaved;
   const allSaved = result?.ok === true && userSaved && commentSaved;
   let displayUpdateFailed = result?.cache_sync_failed === true;
 
   if (anySaved) {
+    for(const {key,op} of conversationEntries) {
+      const saved=op.subordinate_employee_id===state.employeeId ? userSaved : commentSaved;
+      if (!saved) continue;
+      const current = state.conversationChanges.get(key);
+      if (JSON.stringify(current) === JSON.stringify(op)) {
+        state.conversationChanges.delete(key);
+      } else if (op.action === 'create' && current?.action === 'create') {
+        // The submitted UUID now exists: retain newer typing as an edit, not a second create.
+        const pending = {...current, action: 'edit'};
+        delete pending.created_at;
+        state.conversationChanges.set(key, pending);
+      }
+    }
     try {
       if (reportChangesSaved) {
         reportEntries.forEach((entry) => applySavedReportEntry(entry));
@@ -3054,9 +3101,9 @@ async function saveUpdates() {
       commentEntries.forEach((entry) => commitSavedCommentEntry(entry));
     }
     try {
-      if (commentChangesSaved) {
+      if (commentChangesSaved || conversationEntries.length) {
         let refreshResult;
-        if (result.review_patch && !result.cache_sync_failed) {
+        if (!conversationEntries.length && result.review_patch && !result.cache_sync_failed) {
           applySavedReviewPatch(result.review_patch);
           refreshResult = { ok: true };
           syncChrome();

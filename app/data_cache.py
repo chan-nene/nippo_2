@@ -14,7 +14,7 @@ from typing import Any
 import polars as pl
 
 from app.config import AppSettings
-from app.repository import DailyReportRepository, USER_COLUMNS, USER_KEYS, COMMENT_COLUMNS
+from app.repository import DailyReportRepository, USER_COLUMNS, USER_KEYS, COMMENT_COLUMNS, COMMENT_KEYS
 from app.security import safe_employee_csv_path
 
 
@@ -716,7 +716,7 @@ class DailyReportDataCache:
         )
         comment_partitions = repository.normalize_partitions(
             comment_partitions, COMMENT_COLUMNS,
-            ["superior_employee_id", "subordinate_employee_id", "date"],
+            COMMENT_KEYS,
         )
         snapshot = CacheSnapshot(
             settings_paths=self._settings_paths(settings),

@@ -26,36 +26,24 @@ CSVをデータストアとして利用する、pywebview製の日報デスク�
 - `administration.csv`: `record_type,employee_id,display_name,can_input_own_report,employment_type,is_admin,affiliation_type,organization_id,member_order,team_id,team_name,team_type,parent_team_id,sort_order,commenter_employee_id,target_type,target_organization_ids,target_employee_ids`
 - `record_type` は `user_master`（ユーザー）、`team_master`（組織）、`comment_assignment`（コメント担当設定）のいずれかです。該当しない列は空欄です。
 - `calendar.csv`: `date`（管理CSVとは別に保存）
-- 社員別日報CSV: `record_type,employee_id,date,business_name,business_name_rich_text,business_detail,business_detail_rich_text,reply_to_employee_id,reply_text,reply_rich_text,updated_at`
-- `supervisor_comments/{上司ID}.csv`: `superior_employee_id,subordinate_employee_id,date,comment,comment_rich_text,updated_at`
+- 社員別日報CSV: 日報・本人メッセージ・本人のリアクションを `record_type` で区別する18列。
+- 上司別コメントCSV: 上司メッセージ・上司のリアクションを `record_type` で区別する14列。
 
-### 日報と返信の行形式
+現行の列一覧・保存契約・操作は [会話とリアクション仕様](docs/conversations.md) を参照してください。本文の書式JSONは [限定リッチテキスト仕様](docs/limited-rich-text.md) と共通です。
 
-社員別CSVでは、先頭の `record_type` が `report` なら日報、`reply` なら本人から上司への返信です。`employee_id` は書いた本人、`date` は対象の日報の日付です。返信先は `reply_to_employee_id`、返信本文は `reply_text` に保存します。使わない列は空欄です。
+本人と担当上司は、最初の上司コメントの後に何件でも返信できます。同じ人の連続投稿も可能です。保存ボタンで確定し、自分の既存メッセージを空にして保存すると削除表示になります。削除済み本文はCSVに保持します。投稿者本人のファイルだけを書き換えるため、相手のCSVへ書き込むことはありません。
 
-書式付きJSONと完全なCSVエスケープ例は [限定リッチテキスト仕様](docs/limited-rich-text.md) に記載しています。日報行では業務名・業務内容のJSON列、返信行では返信JSON列を使用します。
+### サンプルデータの変換
 
-日報は社員・日付につき1行、返信は社員・日付・返信先につき1行で編集します。空にした返信はその行だけ削除し、日報本文や他の返信は残します。日報本文が未入力の日にも返信行を保存できます。`updated_at` は各行を更新した日時です。
+`python tools/convert_sample_conversations.py --source test_data_v3 --output test_data_v4 --write`
 
-読み込みでは社員CSVを一度読み、日報と返信をメモリ上で分けます。上司コメントとの結合には日報の社員ID・日付・上司IDを使い、画面では従来どおり上司コメント欄内に返信を表示します。旧 `replies` JSON列を持つCSVの読み書きや自動変換には対応しません。列・種別・キーの重複などが不正なCSVは読み込み失敗として扱い、保存で修復・上書きしません。
-
-保存時には、社員CSVと同じフォルダの `{社員ID}.lock` をOSでロックします。ロック内で現在のCSVを読み、画面に読み込んだ時のSHA-256と照合し、日報・返信をまとめて一度の置換で保存します。競合時は下書きを維持して上書きを止めます。ロックファイルは常設で、存在だけでは保存中を意味しません。上司コメントCSVとは別の保存単位です。Excelなどの直接編集はこの専用ロックに従わないため避けてください。
-
-APIの `save_updates` は `user_updates`（日付と日報の変更項目）、`reply_updates`（`date,reply_to_employee_id,reply_rich_text`）、`comment_updates`（対象者・日付・`comment_rich_text`）を受け取ります。変更する項目のJSON列を必須とし、Pythonで通常テキストを生成します。通常テキストも送信した場合はJSONとの一致を検証します。日報・返信の保存には `load_data` の `data.report_revision` を `report_revision` として渡します。日報と返信は同じCSVに保存するため、保存結果は共通の `result.user` で返し、成功時の `revision` を次の保存に使います。
-
-### 旧サンプルデータの変換
-
-一時ツール `tools/convert_sample_report_rows.py` は、元CSVを変更せず別フォルダへ変換します。`--source` と `--output` を指定し、`--write` がなければ事前確認だけを行います。出力先が既に存在する場合は上書きしません。管理CSV・上司コメントCSVはそのままコピーし、空の返信は除外します。
-
-旧データには返信単独の日時がないため、変換した返信の `updated_at` は元の日報行から引き継ぎます。実際の返信日時を復元した値ではありません。新旧アプリを同じデータに接続しないでください。行形式の中間サンプルは `test_data_v2` に残しています。
-
-今回の書式付き形式は、一時ツール `python tools/convert_sample_rich_text.py --source test_data_v2 --output test_data_v3 --write` で別フォルダへ変換しています。`--write` がなければ検証だけ行い、出力先が既にあれば拒否します。元CSVのSHA-256を記録し、変換中に変化していないことを確認します。書式付きサンプルは日報636行・返信3行・上司コメント1909行です。`storage.ini` は `test_data_v3` を参照しています。旧8列/5列形式をアプリが自動補完することはありません。
+`--write` を省くと事前検証のみです。出力先は新規フォルダを指定します。元データは変更せず、変換前後のSHA-256を確認します。旧形式を実行時に自動変換する機能はありません。現行サンプルは `test_data_v4`、元データは `test_data_v3` に残しています。`storage.ini` は現行サンプルを参照し、変更前の設定は `storage.pre-conversations.ini` に残しています。
 
 ### 書式編集のビルド
 
 `frontend/` で `npm ci`、`npm run build` を実行すると、固定した依存バージョンから `web/rich-text.js` とライセンス情報を生成します。通常の起動にはNode.jsや外部CDNへの接続は不要です。ソース・編集操作・JSON契約は [限定リッチテキスト仕様](docs/limited-rich-text.md) を参照してください。
 
-回帰テストは `python -m unittest discover -s tests -p test_report_rows.py -v`、画面側の保存処理のテストは `node --test tests/report_rows_frontend.test.cjs` で実行できます。実際の共有フォルダでの同時保存・通信断、および配布EXEでの確認は別途必要です。
+回帰テストは `python -m unittest discover -s tests -v`、画面側の保存処理のテストは `node --test tests/*frontend.test.cjs` で実行できます。実際の共有フォルダでの同時保存・通信断、および配布EXEでの確認は別途必要です。
 
 ### 管理データの移行と競合防止
 

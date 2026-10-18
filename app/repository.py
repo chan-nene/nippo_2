@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import json
+from app import conversations as conversation
 import io
 from contextlib import contextmanager
 import logging
@@ -31,28 +33,10 @@ logger = logging.getLogger(__name__)
 
 JST = ZoneInfo("Asia/Tokyo")
 
-USER_COLUMNS = [
-    "record_type",
-    "employee_id",
-    "date",
-    "business_name",
-    "business_name_rich_text",
-    "business_detail",
-    "business_detail_rich_text",
-    "reply_to_employee_id",
-    "reply_text",
-    "reply_rich_text",
-    "updated_at",
-]
-USER_KEYS = ["record_type", "employee_id", "date", "reply_to_employee_id"]
-COMMENT_COLUMNS = [
-    "superior_employee_id",
-    "subordinate_employee_id",
-    "date",
-    "comment",
-    "comment_rich_text",
-    "updated_at",
-]
+USER_COLUMNS = conversation.USER_COLUMNS
+USER_KEYS = conversation.USER_KEYS
+COMMENT_COLUMNS = conversation.COMMENT_COLUMNS
+COMMENT_KEYS = conversation.COMMENT_KEYS
 CSV_ENCODINGS = ("utf8", "cp932")
 DEFAULT_BACKUP_LIMIT = 20
 ORGANIZATION_MASTERS = ("user_master", "team_master", "comment_assignment")
@@ -1110,6 +1094,8 @@ class DailyReportRepository:
         *,
         failed_comment_superior_ids: set[str] | None = None,
     ) -> dict[str, Any]:
+        users_df = conversation.project_users(users_df)
+        comments_df = conversation.project_comments(comments_df)
         today = self.today_jst()
         range_end = (
             today
@@ -1195,67 +1181,47 @@ class DailyReportRepository:
             or str(row.get("business_detail") or "").strip()
         )
 
-    def save_updates(
-        self,
-        employee_id: str,
-        user_updates: list[dict[str, Any]],
-        comment_updates: list[dict[str, Any]],
-        common: dict[str, list[dict[str, Any]]] | None = None,
-        *,
-        reply_updates: list[dict[str, Any]] | None = None,
-        report_revision: str = "",
-    ) -> dict[str, Any]:
-        employee_id = validate_employee_id(employee_id)
-        reply_updates = reply_updates or []
-        self._authorize_updates(
-            employee_id,
-            user_updates,
-            comment_updates,
-            common=common,
-            reply_updates=reply_updates,
-        )
-        update_targets = (
-            ("user", user_updates, self._upsert_user_rows),
-            ("comment", comment_updates, self._upsert_comment_rows),
-        )
-        result = {
-            name: {"needed": bool(updates or (name == "user" and reply_updates)), "saved": False, "error": ""}
-            for name, updates, _ in update_targets
-        }
-        for name, updates, writer in update_targets:
-            if not result[name]["needed"]:
-                continue
+    def save_updates(self, employee_id, user_updates, comment_updates, common=None, *, reply_updates=None, report_revision="", conversation_updates=None):
+        common = common or self.load_common()
+        if comment_updates or reply_updates:
+            raise ValueError("旧コメント・返信APIは使用できません。")
+        self._authorize_updates(employee_id, user_updates, [], common=common)
+        operations = conversation.validate_operations(conversation_updates or [])
+        user = next(row for row in common['user_master'] if row['employee_id']==employee_id)
+        assigned = self._assigned_subordinate_ids(common, employee_id)
+        targets = self._resolved_comment_assignments(common)[1]
+        grouped = {'user': [], 'comment': []}
+        for op in operations:
+            sub, sup = op['subordinate_employee_id'], op['superior_employee_id']
+            if sub == sup or sup not in targets.get(sub, []):
+                raise PermissionError('現在のコメント担当の会話だけ更新できます。')
+            if employee_id == sub and self._user_can_input_own_report(user):
+                side = 'user'
+            elif employee_id == sup and sub in assigned and not self._is_temporary_user(user):
+                side = 'comment'
+            else:
+                raise PermissionError('この会話を更新する権限がありません。')
+            grouped[side].append(op)
+        result = {}
+        for side in ('user','comment'):
+            reports = user_updates if side=='user' else []
+            status = result[side] = {'needed':bool(reports or grouped[side]), 'saved':False, 'error':''}
+            if not status['needed']: continue
             try:
-                if name == "user":
-                    partition_path, partition_frame, revision, fingerprint = writer(
-                        employee_id, updates, common=common,
-                        reply_updates=reply_updates, expected_revision=report_revision,
-                    )
-                    result[name]["revision"] = revision
-                    result[name]["_cache_fingerprint"] = fingerprint
-                else:
-                    partition_path, partition_frame = writer(employee_id, updates)
-                result[name]["saved"] = True
-                result[name]["_cache_path"] = str(partition_path)
-                result[name]["_cache_frame"] = partition_frame
-            except (ReportConflictError, ReportFormatError) as exc:
-                result[name]["error"] = str(exc)
-                result[name]["error_code"] = "report_conflict" if isinstance(exc, ReportConflictError) else "report_format"
+                path, output, revision, fingerprint = conversation.save_partition(
+                    self, employee_id, side, reports, grouped[side], common, report_revision)
+                status.update(saved=True, revision=revision, _cache_path=str(path), _cache_frame=output, _cache_fingerprint=fingerprint)
             except CsvFileLockedError as exc:
-                logger.exception("CSV is locked while saving %s updates", name)
-                result[name]["error"] = str(exc)
-                result[name]["error_code"] = "csv_locked"
+                status.update(error=str(exc),error_code='csv_locked')
             except CsvReadonlyError as exc:
-                logger.exception(
-                    "Failed to restore CSV read-only attribute after saving %s",
-                    name,
-                )
-                result[name]["error"] = str(exc)
-                result[name]["error_code"] = "csv_readonly"
+                status.update(error=str(exc),error_code='csv_readonly')
+            except ReportConflictError as exc:
+                status.update(error=str(exc),error_code='report_conflict')
+            except (ValueError, ReportFormatError) as exc:
+                status.update(error=str(exc),error_code='report_format')
             except Exception:
-                logger.exception("Failed to save %s updates", name)
-                result[name]["error"] = "保存先への書き込みに失敗しました。"
-
+                logger.exception('Failed to save %s conversation partition',side)
+                status['error']='保存先への書き込みに失敗しました。'
         return result
 
     def _authorize_updates(
@@ -1339,39 +1305,18 @@ class DailyReportRepository:
         self.loaded_report_fingerprints[key] = (loaded.st_size, loaded.st_mtime_ns)
         if self.defer_partition_normalization:
             return frame
-        return self._dedupe_frame(frame, USER_COLUMNS, USER_KEYS)
+        return frame
 
     @staticmethod
     def _report_path_key(path: Path) -> str:
         """キャッシュと同じ基準で社員CSVのパスを識別する。"""
         return os.path.normcase(str(path.resolve(strict=False)))
 
-    def _validate_report_frame(self, frame: pl.DataFrame, employee_id: str) -> None:
-        """旧形式を補完せず、行の種別・列・参照先・一意性を検証する。"""
-        if frame.columns != USER_COLUMNS:
-            raise ReportFormatError("列は書式付き新形式のrecord_typeから始まる11列である必要があります。")
-        if frame.is_empty():
-            return
-        if not set(frame["record_type"].to_list()) <= {"report", "reply"}:
-            raise ReportFormatError("record_typeはreportまたはreplyが必要です。")
-        if frame.filter(pl.col("employee_id") != employee_id).height:
-            raise ReportFormatError("社員IDとファイル名が一致しません。")
-        parsed_dates = pl.col("date").str.to_date("%Y-%m-%d", strict=False)
-        if frame.filter(parsed_dates.is_null() | (parsed_dates.dt.to_string("%Y-%m-%d") != pl.col("date"))).height:
-            raise ReportFormatError("日付はYYYY-MM-DD形式が必要です。")
-        if frame.select(USER_KEYS).is_duplicated().any():
-            raise ReportFormatError("同じ日報または同じ上司への返信が重複しています。")
-        reports = frame.filter(pl.col("record_type") == "report")
-        replies = frame.filter(pl.col("record_type") == "reply")
-        if reports.filter((pl.col("reply_to_employee_id") != "") | (pl.col("reply_text") != "") | (pl.col("reply_rich_text") != "")).height:
-            raise ReportFormatError("日報行の返信先と返信本文は空欄が必要です。")
-        if replies.filter((pl.col("business_name") != "") | (pl.col("business_detail") != "") | (pl.col("business_name_rich_text") != "") | (pl.col("business_detail_rich_text") != "")
-                          | (pl.col("reply_text").str.strip_chars() == "")).height:
-            raise ReportFormatError("返信行は業務名・業務内容を空欄にし、返信本文を入力してください。")
-        for target in replies["reply_to_employee_id"].unique():
-            validate_employee_id(target, "返信先の社員ID")
-        self._validate_rich_columns(reports, ("business_name", "business_detail"))
-        self._validate_rich_columns(replies, ("reply_text",))
+    def _validate_report_frame(self, frame, employee_id):
+        try:
+            conversation.validate_frame(frame, employee_id, 'user')
+        except ValueError as exc:
+            raise ReportFormatError(str(exc)) from exc
 
     @staticmethod
     def _validate_rich_columns(frame: pl.DataFrame, fields: tuple[str, ...]) -> None:
@@ -1390,18 +1335,15 @@ class DailyReportRepository:
         if not path.exists():
             return self._empty_df(COMMENT_COLUMNS)
         frame = self._read_csv_frame(path)
-        if frame.columns != COMMENT_COLUMNS:
-            raise ReportFormatError("上司コメントCSVは書式列を含む6列が必要です。")
-        self._validate_rich_columns(frame, ("comment",))
+        try:
+            conversation.validate_frame(frame, path.stem, 'comment')
+        except ValueError as exc:
+            raise ReportFormatError(str(exc)) from exc
         if allowed_employee_ids is not None:
             frame = frame.filter(pl.col("subordinate_employee_id").is_in(list(allowed_employee_ids)))
         if self.defer_partition_normalization:
             return frame
-        return self._dedupe_frame(
-            frame,
-            COMMENT_COLUMNS,
-            ["superior_employee_id", "subordinate_employee_id", "date"],
-        )
+        return frame
 
     def combine_report_partitions(
         self, partitions: list[pl.DataFrame]
@@ -1414,7 +1356,9 @@ class DailyReportRepository:
     def normalize_partitions(
         self, partitions: dict[str, pl.DataFrame], columns: list[str], keys: list[str]
     ) -> dict[str, pl.DataFrame]:
-        """Batch small CSV normalization while retaining per-file boundaries."""
+        """Validated conversation CSVs already contain canonical strings and unique keys."""
+        if columns in (USER_COLUMNS, COMMENT_COLUMNS):
+            return partitions
         nonempty = [frame.with_columns(pl.lit(path).alias("_partition"))
                     for path, frame in partitions.items() if not frame.is_empty()]
         if not nonempty:
@@ -1430,7 +1374,7 @@ class DailyReportRepository:
     ) -> pl.DataFrame:
         return self._dedupe_normalized_frame(
             pl.concat(partitions) if partitions else self._empty_df(COMMENT_COLUMNS),
-            ["superior_employee_id", "subordinate_employee_id", "date"],
+            COMMENT_KEYS,
         )
 
     def load_calendar_master(self) -> list[dict[str, Any]]:
@@ -1546,6 +1490,9 @@ class DailyReportRepository:
         global_order: list[str] | None = None,
         target_commenters: dict[str, list[str]] | None = None,
     ) -> tuple[list[dict[str, Any]] | pl.DataFrame, date | None, date | None]:
+        conversations = conversation.conversation_index(users_df, comments_df)
+        users_df = conversation.project_users(users_df)
+        comments_df = conversation.project_comments(comments_df)
         failed_comment_ids = {
             str(item).strip()
             for item in (failed_comment_superior_ids or set())
@@ -1678,6 +1625,13 @@ class DailyReportRepository:
         result = rows.sort("_member_order", "date").select(output_columns)
         if not superior_ids:
             result = result.with_columns(pl.lit([]).alias("comments"))
+        # Only return conversations for visible, available assignment cells.
+        payloads = []
+        for row in result.iter_rows(named=True):
+            payloads.append(json.dumps({cell['superior_employee_id']: conversations.get(
+                (row['employee_id'], row['date'], cell['superior_employee_id']), [])
+                for cell in row['comments'] if cell['applies'] and cell['available']}, ensure_ascii=False))
+        result = result.with_columns(pl.Series('conversation_data', payloads, dtype=pl.String))
         return (result if return_frame else result.to_dicts()), default_start, default_end
 
     def _report_directory_for_employee(
@@ -1700,133 +1654,6 @@ class DailyReportRepository:
             else "regular_reports"
         )
         return self.storage_dir(kind)
-
-    def _upsert_user_rows(
-        self,
-        employee_id: str,
-        updates: list[dict[str, Any]],
-        *,
-        common: dict[str, list[dict[str, Any]]] | None = None,
-        reply_updates: list[dict[str, Any]] | None = None,
-        expected_revision: str = "",
-    ) -> tuple[Path, pl.DataFrame, str, tuple[int, int]]:
-        """本人の日報と返信を、社員CSVの共有ロック内でまとめて保存する。"""
-        user_path = safe_employee_csv_path(
-            self._report_directory_for_employee(employee_id, common), employee_id
-        )
-        if not user_path.parent.is_dir():
-            raise FileNotFoundError(f"日報フォルダが見つかりません: {user_path.parent}")
-        with self._csv_save_lock(user_path.with_suffix(".lock"), "別の端末が日報を保存中です。少し待って再度保存してください。"):
-            existing = self.load_report_partition(user_path, employee_id)
-            if not expected_revision or expected_revision != self.loaded_report_revisions[self._report_path_key(user_path)]:
-                raise ReportConflictError("日報が別の場所で更新されています。編集中の内容を控え、最新データを取得して確認してください。")
-            frame = self._merge_report_updates(existing, employee_id, updates, reply_updates or [])
-            self._validate_report_frame(frame, employee_id)
-            revision = self._write_csv_atomically(frame, user_path, "reports")
-            self.loaded_report_revisions[self._report_path_key(user_path)] = revision
-            saved = user_path.stat()
-            return user_path, frame, revision, (saved.st_size, saved.st_mtime_ns)
-
-    def _merge_report_updates(
-        self, existing: pl.DataFrame, employee_id: str,
-        updates: list[dict[str, Any]], reply_updates: list[dict[str, Any]],
-    ) -> pl.DataFrame:
-        """日報・返信を別々のキーで更新し、空の返信は対象行だけ削除する。"""
-        update_dates = [self._date_key(update.get("date")) for update in updates]
-        rows_by_date = {
-            row["date"]: row
-            for row in existing.filter((pl.col("record_type") == "report") & pl.col("date").is_in(update_dates)).to_dicts()
-        }
-        now = self.now_jst().isoformat()
-        for update in updates:
-            report_date = self._to_date(update.get("date"))
-            if report_date is None:
-                raise ValueError("日報の日付が不正です。")
-            date_text = report_date.isoformat()
-            row = rows_by_date.get(
-                date_text,
-                {
-                    "record_type": "report",
-                    "employee_id": employee_id,
-                    "date": date_text,
-                    "business_name": "",
-                    "business_name_rich_text": EMPTY_RICH_TEXT,
-                    "business_detail": "",
-                    "business_detail_rich_text": EMPTY_RICH_TEXT,
-                    "reply_to_employee_id": "",
-                    "reply_text": "",
-                    "reply_rich_text": "",
-                    "updated_at": now,
-                },
-            )
-            row["employee_id"] = employee_id
-            row["date"] = date_text
-            if "business_name" in update:
-                row["business_name"] = str(update.get("business_name", ""))
-                row["business_name_rich_text"] = update["business_name_rich_text"]
-            if "business_detail" in update:
-                row["business_detail"] = str(update.get("business_detail", ""))
-                row["business_detail_rich_text"] = update["business_detail_rich_text"]
-
-            row["updated_at"] = now
-            rows_by_date[date_text] = row
-
-        changes = list(rows_by_date.values())
-        deleted = []
-        for update in reply_updates:
-            day = self._date_key(update.get("date"))
-            if not day:
-                raise ValueError("返信対象の日付が不正です。")
-            target = validate_employee_id(update.get("reply_to_employee_id"), "返信先の社員ID")
-            message = str(update.get("reply_text", ""))
-            row = dict.fromkeys(USER_COLUMNS, "")
-            row.update(record_type="reply", employee_id=employee_id, date=day,
-                       reply_to_employee_id=target, reply_text=message, reply_rich_text=update["reply_rich_text"], updated_at=now)
-            if message.strip():
-                changes.append(row)
-            else:
-                deleted.append({key: row[key] for key in USER_KEYS})
-        if deleted:
-            existing = existing.join(pl.DataFrame(deleted), on=USER_KEYS, how="anti", maintain_order="left")
-        frame = pl.DataFrame(changes, schema=USER_COLUMNS, orient="row") if changes else self._empty_df(USER_COLUMNS)
-        return self._merge_partition_updates(existing, frame, USER_KEYS)
-
-    def _upsert_comment_rows(
-        self, employee_id: str, updates: list[dict[str, Any]]
-    ) -> tuple[Path, pl.DataFrame]:
-        comments_dir = self.storage_dir("comments")
-        if not comments_dir.is_dir():
-            raise FileNotFoundError(f"上司コメントフォルダが見つかりません: {comments_dir}")
-        comment_path = safe_employee_csv_path(comments_dir, employee_id)
-        keys = ["superior_employee_id", "subordinate_employee_id", "date"]
-        if comment_path.exists():
-            existing = self._read_csv_frame(comment_path)
-            if existing.columns != COMMENT_COLUMNS:
-                raise ReportFormatError("上司コメントCSVは書式列を含む6列が必要です。")
-            self._validate_rich_columns(existing, ("comment",))
-            existing = self._dedupe_frame(existing, COMMENT_COLUMNS, keys)
-        else:
-            existing = self._empty_df(COMMENT_COLUMNS)
-        rows_by_key = {}
-        now = self.now_jst().isoformat()
-        for update in updates:
-            subordinate_id = str(update.get("subordinate_employee_id", "")).strip()
-            report_date = self._to_date(update.get("date"))
-            if not subordinate_id or report_date is None:
-                raise ValueError("コメントの対象者または日付が不正です。")
-            key = (employee_id, subordinate_id, report_date.isoformat())
-            rows_by_key[key] = {
-                "superior_employee_id": employee_id,
-                "subordinate_employee_id": subordinate_id,
-                "date": report_date.isoformat(),
-                "comment": str(update.get("comment", "")),
-                "comment_rich_text": update["comment_rich_text"],
-                "updated_at": now,
-            }
-        changes = pl.DataFrame(list(rows_by_key.values()), schema=COMMENT_COLUMNS, orient="row")
-        df = self._merge_partition_updates(existing, changes, keys)
-        self._write_csv_atomically(df, comment_path, "comments")
-        return comment_path, df
 
     @staticmethod
     def _merge_partition_updates(

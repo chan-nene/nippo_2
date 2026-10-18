@@ -992,24 +992,26 @@ html body .reply-section {
 
 html body .reply-section.is-collapsed {
   position: absolute;
-  z-index: 11;
+  /* Keep the reply action above the reaction badge (z-index: 12). */
+  z-index: 13;
   bottom: 6px;
   right: 8px;
   width: auto;
   min-width: 0;
   max-width: none;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
-/* 細い列で本文が増えても、下端の返信ボタンと重ならない領域を確保する。 */
+/* Reserve a bottom action row, separate from every message card. */
 html body .comment-stack:has(> .reply-section.is-collapsed) {
   padding-bottom: 34px;
 }
 
-html body td:hover .reply-section.is-collapsed,
-html body .comment-stack:focus-within > .reply-section.is-collapsed {
+html body td:hover:not(:has(.is-editing)) .reply-section.is-collapsed {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
 }
 
@@ -1584,8 +1586,9 @@ html body #reportPanel table tbody th.user-col {
 }
 
 
-html body #reportPanel table tbody th.user-col,
-html body #reportPanel table tbody tr.member-group-end > td {
+/* Emphasize boundaries between people, not the bottom edge of the table. */
+html body #reportPanel table tbody tr:has(~ tr.member-group-start) > th.user-col,
+html body #reportPanel table tbody tr.member-group-end:not(:last-child) > td {
   border-bottom: 2px solid var(--border-strong);
 }
 
@@ -2256,4 +2259,81 @@ html body .holiday-visibility-control input { margin: 0; accent-color: var(--pri
     justify-self: end;
     justify-content: flex-end;
   }
+}
+
+/* Date text follows the same narrow-column wrapping policy as report text. */
+html body #reportPanel .date-content,
+html body #reportPanel .date-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+html body #reportPanel .date-value {
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
+}
+html body #reportPanel .date-value > span {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Message cards share the existing reply geometry. Initial comments stay embedded. */
+html body .conversation-card { position: relative; min-width: 0; }
+html body .conversation-card.reply-card { margin: 6px 8px; width: auto; display: block; }
+html body .conversation-initial { background: transparent; }
+/* Selected reactions occupy their own line below the message text. */
+html body #reportPanel .conversation-reaction {
+  position: static;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26.4px;
+  height: 18px;
+  margin: 0 0 0 auto;
+  padding: 0;
+  line-height: 1;
+  font-size: 14.4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  background: transparent;
+}
+html body #reportPanel .conversation-initial > .conversation-reaction {
+  margin-right: 8px;
+  margin-bottom: 0;
+}
+/* Tighten only the space around an existing reaction row. */
+html body #reportPanel .conversation-initial:has(> .conversation-reaction) > .boss-content:not(.is-editing) {
+  padding-bottom: 2px;
+}
+html body #reportPanel .conversation-card.reply-card:has(> .conversation-reaction) {
+  padding-bottom: 2px;
+}
+html body .conversation-float-menu { position: fixed; z-index: 310; display: flex; padding: 4px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 3px 12px #0003; }
+html body .conversation-float-menu[hidden] { display: none; }
+html body .conversation-float-menu button { width: 36px; height: 32px; border: 0; border-radius: 4px; background: transparent; cursor: pointer; font-size: 20px; }
+html body .conversation-float-menu button:is(:hover,[aria-pressed="true"]) { background: var(--table-header-bg); box-shadow: inset 0 0 0 1px var(--border-strong); }
+
+/* Superior replies use the table's opaque surface and neutral borders. */
+html body #reportPanel .conversation-card.reply-card.is-superior {
+  background: var(--table-cell-bg);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+html body #reportPanel .conversation-card.reply-card.is-superior:hover {
+  background: var(--table-cell-bg);
+  border-color: var(--border-strong);
+}
+html body #reportPanel .conversation-card.reply-card.is-superior:has(.reply-content.is-editable):not(:has(.is-editing)):hover {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+html body .comment-stack:has(> .conversation-initial .boss-content.is-editing) > .boss-comment-actions {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Unsaved text uses the same background as report cells, regardless of author color. */
+html body #reportPanel .conversation-card.reply-card.is-dirty:is(.is-superior, .is-subordinate),
+html body #reportPanel .conversation-card.reply-card.is-dirty:is(.is-superior, .is-subordinate):hover,
+html body #reportPanel .conversation-initial.is-dirty {
+  background: var(--dirty);
 }
