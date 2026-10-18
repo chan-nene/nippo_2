@@ -29,21 +29,15 @@ CSVをデータストアとして利用する、pywebview製の日報デスク�
 - 社員別日報CSV: 日報・本人メッセージ・本人のリアクションを `record_type` で区別する18列。
 - 上司別コメントCSV: 上司メッセージ・上司のリアクションを `record_type` で区別する14列。
 
-現行の列一覧・保存契約・操作は [会話とリアクション仕様](docs/conversations.md) を参照してください。本文の書式JSONは [限定リッチテキスト仕様](docs/limited-rich-text.md) と共通です。
+現行のCSV列定義は `app/conversations.py`、本文の書式JSONの処理は `app/rich_text.py` にあります。
 
 本人と担当上司は、最初の上司コメントの後に何件でも返信できます。同じ人の連続投稿も可能です。保存ボタンで確定し、自分の既存メッセージを空にして保存すると削除表示になります。削除済み本文はCSVに保持します。投稿者本人のファイルだけを書き換えるため、相手のCSVへ書き込むことはありません。
 
-### サンプルデータの変換
-
-`python tools/convert_sample_conversations.py --source test_data_v3 --output test_data_v4 --write`
-
-`--write` を省くと事前検証のみです。出力先は新規フォルダを指定します。元データは変更せず、変換前後のSHA-256を確認します。旧形式を実行時に自動変換する機能はありません。現行サンプルは `test_data_v4`、元データは `test_data_v3` に残しています。`storage.ini` は現行サンプルを参照し、変更前の設定は `storage.pre-conversations.ini` に残しています。
+日報データ、端末設定（`storage.ini`・`settings.ini`）、管理用の鍵、仕様書、テスト、変換などの開発用ツールは公開対象に含めていません。旧形式CSVを実行時に自動変換する機能はありません。
 
 ### 書式編集のビルド
 
-`frontend/` で `npm ci`、`npm run build` を実行すると、固定した依存バージョンから `web/rich-text.js` とライセンス情報を生成します。通常の起動にはNode.jsや外部CDNへの接続は不要です。ソース・編集操作・JSON契約は [限定リッチテキスト仕様](docs/limited-rich-text.md) を参照してください。
-
-回帰テストは `python -m unittest discover -s tests -v`、画面側の保存処理のテストは `node --test tests/*frontend.test.cjs` で実行できます。実際の共有フォルダでの同時保存・通信断、および配布EXEでの確認は別途必要です。
+`frontend/` で `npm ci`、`npm run build` を実行すると、固定した依存バージョンから `web/rich-text.js` とライセンス情報を生成します。通常の起動にはNode.jsや外部CDNへの接続は不要です。
 
 ### 管理データの移行と競合防止
 
@@ -59,14 +53,14 @@ CSVをデータストアとして利用する、pywebview製の日報デスク�
 
 ## 使用するJavaScriptライブラリ
 
-WebView内では、次のライブラリを `web/vendor/` に配置して使用します。ライブラリ本体、ロケール、ライセンスファイルはGit管理せず、利用者が各自で公式配布元からダウンロードしてください。
+WebView内では、次のライブラリを `web/vendor/` に同梱して使用します。ライブラリ本体、日本語ロケール、各ライセンスファイルをリポジトリに含めています。
 
 - [Flatpickr](https://flatpickr.js.org/) `4.6.13` — 日付入力カレンダー。MIT License
 - [Tabulator](https://tabulator.info/) `6.5.2` — 管理画面の一覧表示・並び替え・検索。MIT License
 - [SortableJS](https://sortablejs.github.io/Sortable/) `1.15.7` — 組織・所属ユーザーのドラッグ＆ドロップによる並び替え。MIT License
 
-Flatpickrの日本語表示には、Flatpickr `4.6.13` に対応する日本語ロケール `l10n/ja.js` を使用します。各ライブラリのライセンス本文も、ダウンロード元の同じバージョンから取得して `web/vendor/` に配置してください。
+Flatpickrの日本語表示には、Flatpickr `4.6.13` に対応する日本語ロケール `l10n/ja.js` を使用します。再配布時は `web/vendor/` のライセンス本文を保持してください。書式編集で使用するTiptap・ProseMirror等の通知は `web/rich-text.LICENSES.txt`、IBM Plex Sans JPフォントのライセンスは `web/fonts/ibm-plex-sans-jp/` に同梱しています。
 
 ## ライセンス
 
-現在、ライセンスは未指定です
+自作部分のライセンスは現在未指定です。同梱する第三者ライブラリ・フォントには、それぞれのライセンスが適用されます。

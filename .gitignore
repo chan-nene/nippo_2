@@ -1,16 +1,21 @@
 # Local settings and runtime data
 settings.ini
 storage.ini
+settings.*.ini
+storage.*.ini
+.env
+.env.*
 nippo-admin.key
 issue.md
 cache/
 logs/
 text/
 tests/
+frontend/*.test.mjs
+docs/
 test_data*/
 .agent/
 .hallmark/
-web/vendor/
 tools/
 .agents/
 package.json
@@ -18,7 +23,6 @@ package.json
 nippo-rust-tauri/
 poc/
 ui-startup-benchmark/
-docs/
 
 # Python-generated files
 __pycache__/

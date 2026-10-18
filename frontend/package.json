@@ -2,7 +2,7 @@
   "name": "nippo-limited-rich-text",
   "private": true,
   "type": "module",
-  "scripts": {"build": "node build.mjs", "test": "node --test rich-text.test.mjs"},
+  "scripts": {"build": "node build.mjs"},
   "dependencies": {
     "@tiptap/core": "3.31.4",
     "@tiptap/extension-document": "3.31.4",
