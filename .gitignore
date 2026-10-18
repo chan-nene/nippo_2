@@ -18,6 +18,7 @@ package.json
 nippo-rust-tauri/
 poc/
 ui-startup-benchmark/
+docs/
 
 # Python-generated files
 __pycache__/
