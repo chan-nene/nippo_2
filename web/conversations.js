@@ -78,6 +78,7 @@ function renderConversationCell(row,cell,rowIndex,commentIndex) {
   return `<td class="comment-col"><div class="comment-stack">${sign}${initialHtml}${replies}${add}</div></td>`;
 }
 function renderConversationMessage(row,cell,message,rowIndex,commentIndex) {
+  if (message.message_kind === 'reply' && message.deleted_at) return '';
   const own=message.author_employee_id===state.employeeId;
   const initial=message.message_kind==='initial_comment';
   const editable=own && canParticipate(row,cell) && !message.deleted_at;
