@@ -37,6 +37,48 @@ CSVの読み書きにはPython標準の`csv`、結合・抽出・重複整理に
 
 日報データ、端末設定（`storage.ini`・`settings.ini`）、管理用の鍵、仕様書、テスト、変換などの開発用ツールは公開対象に含めていません。旧形式CSVを実行時に自動変換する機能はありません。
 
+### 旧形式CSVの変換（convert_csv.py）
+
+`convert_csv.py` は、最初期のCSVを現行のv4形式へ変換するツールです。対象は、`replies` 列を持つ旧日報CSVと、次の5列構成の上司コメントCSVです。
+
+```text
+superior_employee_id,subordinate_employee_id,date,comment,updated_at
+```
+
+変換元には、次の4フォルダが必要です。
+
+```text
+test_data/
+├─ regular_employee_reports/
+├─ temporary_employee_reports/
+├─ supervisor_comments/
+└─ common_data/
+```
+
+プロジェクトのルートフォルダでPowerShellを開き、まず検証だけ実行します。以下は、セットアップ済みの `.venv` を使用する例です。
+
+```powershell
+.\.venv\Scripts\python.exe .\convert_csv.py --source .\test_data --output .\converted_v4
+```
+
+エラーがないことを確認したら、`--write` を付けて実際に出力します。
+
+```powershell
+.\.venv\Scripts\python.exe .\convert_csv.py --source .\test_data --output .\converted_v4 --write
+```
+
+| 引数 | 意味 |
+| --- | --- |
+| `--source` | 変換元のデータフォルダ |
+| `--output` | 新しく作成する出力フォルダ |
+| `--write` | 実際に出力する。省略時は検証のみで、ファイルを作成しない |
+
+- 出力先は、変換元の外側にある未作成のフォルダを指定してください。出力先の親フォルダは存在する必要があります。
+- 元データ、`settings.ini`、`storage.ini` は変更しません。アプリの参照先も自動では切り替わりません。
+- `common_data` 直下のCSVはそのままコピーし、変換記録を出力先の `migration-v1-to-v4.json` に保存します。
+- 空の返信・上司コメントはスキップします。変換件数と警告は実行結果のJSONで確認できます。
+- 旧 `updated_at` にタイムゾーンがない場合は日本時間として扱い、空の場合は対象日の日本時間00:00で補完します。
+
 ### 書式編集のビルド
 
 `frontend/` で `npm ci`、`npm run build` を実行すると、固定した依存バージョンから `web/rich-text.js` とライセンス情報を生成します。通常の起動にはNode.jsや外部CDNへの接続は不要です。
