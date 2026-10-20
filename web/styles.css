@@ -6,16 +6,9 @@
 :root {
   color-scheme: light;
   --font-ui: "IBM Plex Sans JP", "Yu Gothic UI", sans-serif;
-  --font-10: 10px;
-  --font-12: 12px;
-  --font-13: 13px;
-  --font-14: 14px;
-  --font-15: 15px;
-  --font-16: 16px;
-  --font-18: 18px;
   --ui-text-offset-y: 1px;
-  /* Shared content scale: every requested size is an exact CSS pixel value. */
-  --ui-font-size: 14px;
+  /* Five exact CSS pixel sizes: compact 11 through xlarge 15. */
+  --ui-font-size: 12px;
   --app-bg: #f7f7f8;
   --surface: #ffffff;
   --surface-alt: var(--app-bg);
@@ -405,14 +398,7 @@ html.is-color-theme-switching *::after {
 }
 
 html body[data-font-size="compact"] {
-  --font-10: 9px;
-  --font-12: 11px;
-  --font-13: 12px;
-  --font-14: 13px;
-  --font-15: 14px;
-  --font-16: 15px;
-  --font-18: 17px;
-  --ui-font-size: 13px;
+  --ui-font-size: 11px;
   --control-height: 30px;
   --table-row-height: 38px;
   --table-header-height: 34px;
@@ -433,14 +419,7 @@ html body[data-font-size="compact"] {
 }
 
 html body[data-font-size="medium"] {
-  --font-10: 11px;
-  --font-12: 13px;
-  --font-13: 14px;
-  --font-14: 15px;
-  --font-15: 16px;
-  --font-16: 17px;
-  --font-18: 20px;
-  --ui-font-size: 15px;
+  --ui-font-size: 13px;
   --control-height: 36px;
   --table-row-height: 46px;
   --table-header-height: 40px;
@@ -461,14 +440,7 @@ html body[data-font-size="medium"] {
 }
 
 html body[data-font-size="large"] {
-  --font-10: 12px;
-  --font-12: 14px;
-  --font-13: 15px;
-  --font-14: 16px;
-  --font-15: 17px;
-  --font-16: 18px;
-  --font-18: 21px;
-  --ui-font-size: 16px;
+  --ui-font-size: 14px;
   --control-height: 40px;
   --table-row-height: 50px;
   --table-header-height: 43px;
@@ -489,14 +461,7 @@ html body[data-font-size="large"] {
 }
 
 html body[data-font-size="xlarge"] {
-  --font-10: 13px;
-  --font-12: 16px;
-  --font-13: 17px;
-  --font-14: 18px;
-  --font-15: 20px;
-  --font-16: 21px;
-  --font-18: 23px;
-  --ui-font-size: 17px;
+  --ui-font-size: 15px;
   --control-height: 44px;
   --table-row-height: 56px;
   --table-header-height: 48px;
@@ -514,6 +479,21 @@ html body[data-font-size="xlarge"] {
   --date-column-width: 136px;
   --badge-height: 23px;
   --settings-padding: 22px;
+}
+
+/* Resolve relative type sizes on body so each selected size updates every screen. */
+html body {
+  --font-9: max(9px, calc(var(--ui-font-size) - 5px));
+  --font-10: max(9px, calc(var(--ui-font-size) - 4px));
+  --font-11: max(9px, calc(var(--ui-font-size) - 3px));
+  --font-12: max(9px, calc(var(--ui-font-size) - 2px));
+  --font-13: max(9px, calc(var(--ui-font-size) - 1px));
+  --font-14: var(--ui-font-size);
+  --font-15: calc(var(--ui-font-size) + 1px);
+  --font-16: calc(var(--ui-font-size) + 2px);
+  --font-18: calc(var(--ui-font-size) + 4px);
+  --font-21: calc(var(--ui-font-size) + 7px);
+  --font-23: calc(var(--ui-font-size) + 9px);
 }
 
 html,
@@ -771,7 +751,7 @@ html body .title-bar-title {
   overflow: hidden;
   color: var(--text-strong);
   font-family: "Segoe UI", Arial, sans-serif;
-  font-size: 15px;
+  font-size: var(--font-15);
   font-weight: 800;
   letter-spacing: 0.08em;
   text-overflow: ellipsis;
@@ -924,7 +904,7 @@ html body .theme-mode-switch > button {
   border-radius: 6px;
   background: transparent;
   color: var(--theme-off);
-  font: 600 14px/14px var(--theme-font);
+  font: 600 var(--ui-font-size)/1 var(--theme-font);
   cursor: pointer;
   transition: opacity var(--theme-option-duration) ease, background-color var(--theme-option-duration) ease, color var(--theme-option-duration) ease;
 }
@@ -1265,7 +1245,7 @@ html body .sidebar-utility-text {
 
 html body .sidebar-item .sidebar-text,
 html body .sidebar-utility-button .sidebar-utility-text {
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 /* Main layout */
@@ -1403,7 +1383,7 @@ html body .message-close-button {
   background: transparent;
   color: currentColor;
   padding: 0;
-  font-size: 18px;
+  font-size: var(--font-18);
   line-height: 1;
 }
 
@@ -1487,12 +1467,12 @@ html body[data-font-size]
   font-size: var(--ui-font-size);
 }
 
-html body:is([data-font-size="compact"], [data-font-size="medium"], [data-font-size="large"], [data-font-size="xlarge"])
+html body[data-font-size]
   :is(.title-bar-title, .view-label #pageTitle) {
   font-size: var(--font-16);
 }
 
-html body:is([data-font-size="compact"], [data-font-size="medium"], [data-font-size="large"], [data-font-size="xlarge"])
+html body[data-font-size]
   :is(.settings-card h2, .settings-card h3) {
   font-size: var(--font-18);
 }
@@ -1506,7 +1486,7 @@ html body[data-font-size]
   font-size: var(--ui-font-size);
 }
 
-html body:is([data-font-size="compact"], [data-font-size="medium"], [data-font-size="large"], [data-font-size="xlarge"])
+html body[data-font-size]
   .toolbar-button-badge {
   font-size: var(--font-10);
 }
@@ -1644,7 +1624,7 @@ html body .sidebar-utility-text {
   width: 68px;
   max-width: 68px;
   flex: 0 0 auto;
-  font-size: 12px;
+  font-size: var(--font-12);
   line-height: 1.2;
   text-align: center;
 }
@@ -1661,10 +1641,10 @@ html body .current-user {
   font-size: var(--font-13);
 }
 
-/* Keep the compact rail labels at 10pt even when the global font-size control is enlarged. */
+/* Rail labels follow the shared secondary text scale. */
 html body[data-font-size] .sidebar .sidebar-item .sidebar-text,
 html body[data-font-size] .sidebar .sidebar-utility-button .sidebar-utility-text {
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 /* IBM Plex Sans JP sits slightly high inside a browser line box. Move
@@ -1720,6 +1700,6 @@ html body .sidebar-version {
   margin-top: auto;
   padding: 16px 4px;
   color: color-mix(in srgb, var(--sidebar-muted) 75%, var(--sidebar-bg));
-  font-size: 11px;
+  font-size: var(--font-11);
   line-height: 1.5;
 }

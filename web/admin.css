@@ -670,7 +670,7 @@ html body .team-unsaved-label {
   align-items: center;
   border-radius: 999px;
   padding: 0 6px;
-  font-size: 9px;
+  font-size: var(--font-9);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -961,7 +961,7 @@ html body .inspector-field {
 
 html body .inspector-field-hint {
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: var(--font-9);
   line-height: 1.35;
 }
 
@@ -993,7 +993,7 @@ html body .inspector-field-label {
 html body .inspector-field-label small {
   color: var(--text-muted);
   font-family: var(--font-ui);
-  font-size: 9px;
+  font-size: var(--font-9);
   font-weight: 500;
 }
 
@@ -1106,7 +1106,7 @@ html body .subordinate-option-copy strong {
 html body .subordinate-option-copy small {
   margin-top: 1px;
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: var(--font-9);
 }
 
 html body .subordinate-empty {
@@ -1892,7 +1892,7 @@ html body #adminPanel .admin-title-line {
 html body #adminPanel .admin-eyebrow {
   margin: 0 0 3px;
   color: var(--org-muted);
-  font-size: 11px;
+  font-size: var(--font-11);
   font-weight: 700;
   letter-spacing: 0.1em;
 }
@@ -1900,7 +1900,7 @@ html body #adminPanel .admin-eyebrow {
 html body #adminPanel .admin-title-line h2 {
   margin: 0 0 5px;
   color: var(--org-ink-strong);
-  font-size: clamp(22px, 3vw, 30px);
+  font-size: clamp(calc(var(--ui-font-size) + 8px), 3vw, calc(var(--ui-font-size) + 16px));
   line-height: 1.2;
 }
 
@@ -1908,7 +1908,7 @@ html body #adminPanel .admin-page-description {
   max-width: 690px;
   margin: 0;
   color: var(--org-muted);
-  font-size: 14px;
+  font-size: var(--font-14);
   line-height: 1.5;
 }
 
@@ -1928,7 +1928,7 @@ html body #adminPanel .admin-page-save {
   background: var(--action-primary-bg);
   color: var(--action-primary-fg);
   padding: 0 13px;
-  font-size: 14px;
+  font-size: var(--font-14);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -2080,14 +2080,14 @@ html body #adminPanel .master-table-heading h3,
 html body #adminPanel .team-browser-heading h2 {
   margin: 0;
   color: var(--org-ink-strong);
-  font-size: 15px;
+  font-size: var(--font-15);
   font-weight: 700;
 }
 
 html body #adminPanel .master-table-count,
 html body #adminPanel .team-browser-count {
   color: var(--org-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
   font-weight: 400;
 }
 
@@ -2280,7 +2280,7 @@ html body #adminPanel .team-name {
 
 html body #adminPanel .team-count {
   color: var(--org-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 html body #adminPanel .team-browser-add {
@@ -2316,7 +2316,7 @@ html body #adminPanel .team-inspector-header {
 html body #adminPanel .team-inspector-breadcrumb {
   margin-bottom: 7px;
   color: var(--org-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 html body #adminPanel .team-inspector-title-row {
@@ -2326,21 +2326,21 @@ html body #adminPanel .team-inspector-title-row {
 html body #adminPanel .team-inspector-title-row h3 {
   margin: 0 0 3px;
   color: var(--org-ink-strong);
-  font-size: 23px;
+  font-size: var(--font-23);
   line-height: 1.2;
 }
 
 html body #adminPanel .team-inspector-title-row p {
   margin: 0;
   color: var(--org-muted);
-  font-size: 13px;
+  font-size: var(--font-13);
 }
 
 html body #adminPanel .team-status {
   min-height: 25px;
   border-color: var(--org-rule);
   color: var(--org-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 html body #adminPanel .team-assignment-grid {
@@ -2369,14 +2369,14 @@ html body #adminPanel .team-assignment-card .section-heading {
 html body #adminPanel .team-assignment-card .section-heading h3 {
   margin: 0;
   color: var(--org-ink-strong);
-  font-size: 15px;
+  font-size: var(--font-15);
 }
 
 html body #adminPanel .team-assignment-card > p {
   min-height: 42px;
   margin: 0 0 12px;
   color: var(--org-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
   line-height: 1.45;
 }
 
@@ -2407,25 +2407,25 @@ html body #adminPanel .team-member-avatar {
   flex-basis: 27px;
   background: var(--org-active);
   color: var(--org-ink-strong);
-  font-size: 11px;
+  font-size: var(--font-11);
   font-weight: 700;
 }
 
 html body #adminPanel .team-member-meta strong {
   color: var(--org-ink-strong);
-  font-size: 14px;
+  font-size: var(--font-14);
   font-weight: 600;
 }
 
 html body #adminPanel .team-member-meta small {
   color: var(--org-muted);
-  font-size: 11px;
+  font-size: var(--font-11);
 }
 
 html body #adminPanel .team-member-group-heading {
   margin: 8px 5px 2px;
   color: var(--org-muted);
-  font-size: 11px;
+  font-size: var(--font-11);
   font-weight: 700;
 }
 
@@ -2479,7 +2479,7 @@ html body #adminPanel .team-assignment-remove {
   border: 0;
   background: transparent;
   color: var(--org-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 html body #adminPanel .team-assignment-remove:hover,
@@ -2492,7 +2492,7 @@ html body #adminPanel .team-assignment-empty {
   margin: 0;
   color: var(--org-muted);
   padding: 10px 5px;
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 html body #adminPanel :is(.team-assignment-picker, .user-team-picker) > summary {
@@ -2508,7 +2508,7 @@ html body #adminPanel .team-assignment-picker .add-link {
   align-items: center;
   background: transparent;
   color: var(--org-muted);
-  font-size: 13px;
+  font-size: var(--font-13);
   font-weight: 600;
   cursor: pointer;
 }
@@ -2535,7 +2535,7 @@ html body #adminPanel .team-detail-note {
   background: var(--org-subtle);
   color: var(--org-muted);
   padding: 11px 13px;
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 html body #adminPanel .team-detail-note strong {
@@ -2552,7 +2552,7 @@ html body #adminPanel .team-detail-note-mark {
   place-items: center;
   border: 1px solid var(--org-rule-strong);
   border-radius: 50%;
-  font-size: 10px;
+  font-size: var(--font-10);
   font-weight: 700;
 }
 
@@ -2562,7 +2562,7 @@ html body #adminPanel .user-advanced-settings {
   border-top: 1px solid var(--org-rule);
   color: var(--org-muted);
   padding-top: 13px;
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 html body #adminPanel :is(.team-settings, .user-advanced-settings) > summary {
@@ -2622,13 +2622,13 @@ html body #adminPanel .organization-user-table tbody td:first-child {
 }
 
 html body #adminPanel .organization-user-table th {
-  font-size: 13px;
+  font-size: var(--font-13);
   font-weight: 700;
 }
 
 html body #adminPanel .organization-user-table td {
   color: var(--org-ink);
-  font-size: 13px;
+  font-size: var(--font-13);
   font-weight: 400;
 }
 
@@ -2742,14 +2742,14 @@ html body #adminPanel .user-editor-header h2,
 html body #adminPanel .inspector-form-header h3 {
   margin: 0 0 4px;
   color: var(--org-ink-strong);
-  font-size: 16px;
+  font-size: var(--font-16);
 }
 
 html body #adminPanel .editor-caption,
 html body #adminPanel .inspector-form-header > span {
   margin: 0 0 17px;
   color: var(--org-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 html body #adminPanel .user-editor-fields,
@@ -2768,7 +2768,7 @@ html body #adminPanel .user-managed-field {
 html body #adminPanel .inspector-field-label,
 html body #adminPanel .user-managed-label {
   color: var(--org-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
   font-weight: 600;
 }
 
@@ -2781,7 +2781,7 @@ html body #adminPanel .inspector-required-tag {
   border-radius: 999px;
   background: color-mix(in srgb, var(--error) 8%, var(--org-surface));
   color: color-mix(in srgb, var(--error) 76%, var(--org-ink));
-  font-size: 10px;
+  font-size: var(--font-10);
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
@@ -2831,7 +2831,7 @@ html body #adminPanel .inspector-radio-option {
   align-items: center;
   gap: 6px;
   color: var(--org-ink);
-  font-size: 13px;
+  font-size: var(--font-13);
   font-weight: 400;
 }
 
@@ -2897,7 +2897,7 @@ html body #adminPanel .user-team-tag {
   background: var(--org-subtle);
   color: var(--org-ink);
   padding: 3px 9px;
-  font-size: 12px;
+  font-size: var(--font-12);
   font-weight: 400;
 }
 
@@ -2922,7 +2922,7 @@ html body #adminPanel .user-team-picker select {
 
 html body #adminPanel .user-tag-empty {
   color: var(--org-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 html body #adminPanel .user-commenter-teams {
@@ -2939,7 +2939,7 @@ html body #adminPanel .user-commenter-teams {
 
 html body #adminPanel .user-commenter-team {
   color: var(--org-ink);
-  font-size: 13px;
+  font-size: var(--font-13);
 }
 
 html body #adminPanel .user-commenter-team:not(:last-child)::after {
@@ -2950,7 +2950,7 @@ html body #adminPanel .user-commenter-team:not(:last-child)::after {
 
 html body #adminPanel .user-commenter-teams.is-empty {
   color: var(--org-muted);
-  font-size: 13px;
+  font-size: var(--font-13);
 }
 
 html body #adminPanel .user-advanced-settings {
@@ -3006,7 +3006,7 @@ html body #adminPanel .user-editor-dialog-header {
 html body #adminPanel .user-editor-dialog-header h2 {
   margin: 0;
   color: var(--org-ink-strong);
-  font-size: 21px;
+  font-size: var(--font-21);
   line-height: 1.25;
 }
 
@@ -3049,7 +3049,7 @@ html body #adminPanel .team-editor-modal-members {
 html body #adminPanel .team-editor-modal-members h3 {
   margin: 0;
   color: var(--org-ink-strong);
-  font-size: 15px;
+  font-size: var(--font-15);
   font-weight: 700;
 }
 
@@ -3152,7 +3152,7 @@ html body #adminPanel .team-editor-modal-member-id {
   flex: 0 0 auto;
   color: var(--org-muted);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: var(--font-13);
   white-space: nowrap;
 }
 
@@ -3160,7 +3160,7 @@ html body #adminPanel .team-editor-modal-member-name {
   min-width: 0;
   overflow: hidden;
   color: var(--org-ink-strong);
-  font-size: 14px;
+  font-size: var(--font-14);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3169,7 +3169,7 @@ html body #adminPanel .team-editor-modal-member-name {
 html body #adminPanel .team-editor-modal-member-empty {
   margin: 0;
   color: var(--org-muted);
-  font-size: 13px;
+  font-size: var(--font-13);
 }
 
 html body #adminPanel .team-editor-dialog .team-editor-modal-actions {
@@ -3271,7 +3271,7 @@ html body #adminPanel .inspector-save-button {
   border: 1px solid transparent;
   border-radius: var(--radius-control);
   padding: 0 var(--control-padding-x);
-  font-size: 14px;
+  font-size: var(--font-14);
   font-weight: 600;
 }
 
@@ -3579,7 +3579,7 @@ html body #adminPanel .organization-browser-v2 > .team-browser-heading {
 html body #adminPanel .organization-browser-eyebrow {
   margin: 0 0 2px;
   color: var(--org-muted);
-  font-size: 11px;
+  font-size: var(--font-11);
   font-weight: 700;
   letter-spacing: 0.08em;
 }
@@ -3587,7 +3587,7 @@ html body #adminPanel .organization-browser-eyebrow {
 html body #adminPanel .organization-browser-v2 > .team-browser-heading h2 {
   margin: 0;
   color: var(--org-ink-strong);
-  font-size: 18px;
+  font-size: var(--font-18);
 }
 
 html body #adminPanel .organization-pane-heading {
@@ -3606,7 +3606,7 @@ html body #adminPanel .organization-pane-heading h2 {
   overflow: hidden;
 
   color: var(--org-ink-strong);
-  font-size: 16px;
+  font-size: var(--font-16);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3616,7 +3616,7 @@ html body #adminPanel .organization-pane-heading p {
   overflow: hidden;
   margin: 0;
   color: var(--org-muted);
-  font-size: 11px;
+  font-size: var(--font-11);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3625,7 +3625,7 @@ html body #adminPanel .organization-pane-heading p {
 html body #adminPanel .organization-pane-count {
   flex: 0 0 auto;
   color: var(--org-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
   white-space: nowrap;
 }
 
@@ -3639,7 +3639,7 @@ html body #adminPanel .organization-section-pane .organization-pane-heading > .t
   min-height: 30px;
   margin: 0;
   padding-inline: 10px;
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 html body #adminPanel .organization-section-pane .organization-pane-heading > .organization-pane-count {
@@ -3673,7 +3673,7 @@ html body #adminPanel .organization-card.is-dragging .organization-card-select:f
 html body #adminPanel .organization-card .organization-section-count {
   align-self: center;
   color: var(--org-muted);
-  font-size: 11px;
+  font-size: var(--font-11);
   white-space: nowrap;
 }
 
@@ -3826,7 +3826,7 @@ html body #adminPanel .organization-card-toggle {
   background: transparent;
   color: var(--org-muted);
   padding: 0 7px;
-  font-size: 12px;
+  font-size: var(--font-12);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -3959,13 +3959,13 @@ html body #adminPanel .team-level-label:is(.is-department, .is-section, .is-dire
   background: var(--org-subtle);
   color: var(--org-muted);
   padding: 2px 7px;
-  font-size: 11px;
+  font-size: var(--font-11);
   font-weight: 700;
 }
 
 html body #adminPanel .organization-member-count {
   color: var(--org-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
   white-space: nowrap;
 }
 
@@ -4012,7 +4012,7 @@ html body #adminPanel .assignment-checklist {
 html body #adminPanel .assignment-checklist legend {
   color: var(--org-muted);
   padding: 0 4px;
-  font-size: 12px;
+  font-size: var(--font-12);
   font-weight: 700;
 }
 
@@ -4747,7 +4747,7 @@ html body #adminPanel .organization-card-list > .organization-pane-empty {
   background: transparent;
   padding: 20px 4px;
   color: var(--org-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
   line-height: 1.5;
   text-align: left;
 }
@@ -4861,7 +4861,7 @@ html body #adminPanel .user-status-tag {
   padding: 2px 6px 1px;
   border-radius: 4px;
   font-family: var(--font-ui);
-  font-size: max(1px, calc(var(--ui-font-size) - 2px));
+  font-size: var(--font-12);
   font-weight: 600;
   line-height: 1.1;
   white-space: nowrap;

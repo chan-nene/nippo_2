@@ -209,7 +209,7 @@ html body .toolbar-button-icon {
   align-items: center;
   justify-content: center;
   color: currentColor;
-  font-size: 12px;
+  font-size: var(--font-12);
   font-weight: 700;
 }
 
@@ -452,7 +452,7 @@ html body td {
   padding: 0;
   background: var(--table-cell-bg);
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--font-14);
   vertical-align: top;
 }
 
@@ -491,7 +491,7 @@ html body th {
   border-bottom-color: var(--table-border);
   background: var(--table-header-bg);
   color: var(--text-strong);
-  font-size: 13px;
+  font-size: var(--font-13);
   font-weight: 700;
   vertical-align: middle;
   white-space: nowrap;
@@ -631,7 +631,7 @@ html body #reportPanel table thead th .column-header-you {
   border-radius: 4px;
 
   font-family: var(--font-ui);
-  font-size: calc(var(--ui-font-size) - 2px);
+  font-size: var(--font-12);
   font-weight: 600;
   line-height: 1.1;
   white-space: nowrap;
@@ -731,7 +731,7 @@ html body .date-value {
 html body .date-weekday,
 html body .cell-sub-label {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-12);
 }
 
 html body .date-weekday-sat {
@@ -932,7 +932,7 @@ html body .boss-comment-link {
   height: 22px;
   min-height: 0;
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--font-12);
   line-height: 16px;
   white-space: nowrap;
   align-items: center;
@@ -1086,7 +1086,7 @@ html body .empty {
   border-radius: var(--radius-sm);
   background: var(--surface-alt);
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--font-13);
 }
 
 /* Only the table scrolls; filters and navigation stay fixed to the viewport. */
@@ -1153,7 +1153,7 @@ html body .rich-text-menu button {
   border-radius: 4px;
   background: transparent;
   color: inherit;
-  font-size: 16px;
+  font-size: var(--font-16);
   cursor: pointer;
 }
 html body .rich-text-menu button:hover,
@@ -1487,7 +1487,7 @@ html body #reportPanel .period-date-range {
   padding-inline: 2px;
   color: color-mix(in srgb, var(--text-muted) 76%, var(--surface));
   font-family: var(--font-ui);
-  font-size: max(11px, calc(var(--ui-font-size) - 2px));
+  font-size: var(--font-12);
   font-weight: 600;
   line-height: 1;
   letter-spacing: 0.01em;
@@ -2103,7 +2103,7 @@ html body[data-font-size] #tableWrap .reply-card-content {
 }
 
 html body[data-font-size] #reportPanel table thead th .column-header-you {
-  font-size: max(1px, calc(var(--ui-font-size) - 2px));
+  font-size: var(--font-12);
   line-height: 1.1;
 }
 
@@ -2202,7 +2202,7 @@ html body #reportPanel .date-today-label {
   border: 1px solid var(--self-label-border);
   background: var(--today-label-bg);
   color: var(--today-label-fg);
-  font-size: max(1px, calc(var(--ui-font-size) - 2px));
+  font-size: var(--font-12);
   font-weight: 600;
   line-height: 1.1;
   white-space: nowrap;
@@ -2245,21 +2245,6 @@ html body .holiday-visibility-control {
   color: var(--text);
 }
 html body .holiday-visibility-control input { margin: 0; accent-color: var(--primary); }
-@media (max-width: 1100px) {
-  html body #reportPanel .toolbar-filter-row .period-main-controls,
-  html body #reportPanel.is-missing-mode .toolbar-filter-row .period-main-controls {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    flex-wrap: wrap;
-  }
-  html body #reportPanel .toolbar-filter-row .toolbar-right,
-  html body #reportPanel.is-missing-mode .toolbar-filter-row .toolbar-right {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-self: end;
-    justify-content: flex-end;
-  }
-}
 
 /* Date text follows the same narrow-column wrapping policy as report text. */
 html body #reportPanel .date-content,
