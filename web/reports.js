@@ -341,8 +341,9 @@ function exitMissingCommentsFilter() {
     selectedSubordinateId: "",
   };
   state.activePeriodPreset = previous.preset || "default";
-  state.startDate = previous.startDate || state.startDate;
-  state.endDate = previous.endDate || state.endDate;
+  // 再起動後は退避期間がないため、空の日付を渡して直近を再計算する。
+  state.startDate = previous.startDate || "";
+  state.endDate = previous.endDate || "";
   const selectedMemberIsAvailable = state.viewableMembers.some(
     (member) =>
       member.employee_id === previous.selectedSubordinateId &&
@@ -2597,6 +2598,7 @@ function cancelEditing() {
     Boolean(snapshot?.actionsHidden),
   );
   editingElement.classList.remove("is-editing");
+  discardEmptyNewReply(editingElement);
   currentEditingElement = null;
   editingSnapshot = null;
   syncChrome();
@@ -2680,6 +2682,7 @@ function finishEditing() {
     }
   }
   richSelectionDrag = null;
+  discardEmptyNewReply(element);
   currentEditingElement=null;
   editingSnapshot=null;
 }

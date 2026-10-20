@@ -33,6 +33,16 @@ function recordMessageChange(row,cell,message,text,rich) {
   else state.conversationChanges.set(conversationDraftKey(op),op);
   syncConversationInitial(cell);
 }
+function discardEmptyNewReply(element) {
+  if (element.dataset.kind !== 'message') return;
+  const {row:ri,comment:ci,field}=element.dataset;
+  const row=state.rows[Number(ri)],cell=row?.comments?.[Number(ci)];
+  const message=conversationMessage(ri,ci,field);
+  if (!message?.is_new || message.message_kind !== 'reply' || message.message_text.trim()) return;
+  state.conversationChanges.delete(conversationDraftKey(messageOperation(row,cell,message,'create')));
+  cell.messages.splice(cell.messages.indexOf(message),1);
+  element.closest('.conversation-card')?.remove();
+}
 function reapplyConversationDrafts() {
   for(const op of state.conversationChanges.values()) {
     const row=state.rows.find(r=>r.employee_id===op.subordinate_employee_id && r.date===op.date);
