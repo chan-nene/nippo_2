@@ -2072,7 +2072,11 @@ function isReplyDirty(row, cell) {
 }
 
 function isBossCommentDirty(row, cell) {
-  return state.commentChanges.has(getReplyKey(row, cell));
+  if (state.commentChanges.has(getReplyKey(row, cell))) return true;
+  const initial = cell.messages?.find(message => message.message_kind === "initial_comment");
+  return Boolean(initial && state.conversationChanges?.has(
+    conversationDraftKey(messageOperation(row, cell, initial, initial.is_new ? "create" : "edit")),
+  ));
 }
 
 function renderEditableCell({

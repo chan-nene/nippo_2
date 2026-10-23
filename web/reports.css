@@ -783,7 +783,8 @@ html body td:hover:not(:has(.is-editing)):has(.editable-content.is-editable:not(
   pointer-events: none;
 }
 
-html body .editable-content.is-empty {
+/* Empty placeholders must not hide text typed into the rich editor. */
+html body .editable-content.is-empty:not(.is-editing) {
   color: transparent;
 }
 
