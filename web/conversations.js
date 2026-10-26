@@ -139,10 +139,16 @@ function renderConversationMessage(row,cell,message,rowIndex,commentIndex) {
   const authorName=message.author_employee_id===cell.superior_employee_id ? cell.superior_name : row.display_name;
   const content=renderEditableCell({kind:'message',type:initial?'boss':'reply',field,rowIndex,commentIndex,value:message.message_text,editable,showEmptyIcon:false,dirty,editLabel:`${authorName || ''}のメッセージ`});
   const selected=CONVERSATION_REACTIONS[message.reaction_type];
+  // Reactions belong to the other participant in this two-person conversation.
+  const reactorIsSubordinate=message.author_employee_id===cell.superior_employee_id;
+  const reactorName=reactorIsSubordinate
+    ? row.display_name || row.employee_id
+    : cell.superior_name || cell.superior_employee_id;
+  const reactionLabel=selected ? `${selected[1]}（${reactorName}）` : 'リアクションを追加';
   const canReact=!initial && !own && !message.deleted_at && canParticipate(row,cell);
   const reaction=canReact
-    ? `<button class="conversation-reaction-toggle${selected ? ' has-reaction' : ''}" type="button" data-conversation-action="reaction-menu" ${attrs} aria-label="${selected ? selected[1]+'：変更・解除' : 'リアクションを追加'}" aria-expanded="false" title="${selected?.[1] || 'リアクションを追加'}">${selected?.[0] || '+'}</button>`
-    : !initial && selected ? `<span class="conversation-reaction-badge" title="${selected[1]}" aria-label="${selected[1]}">${selected[0]}</span>` : '';
+    ? `<button class="conversation-reaction-toggle${selected ? ' has-reaction' : ''}" type="button" data-conversation-action="reaction-menu" ${attrs} aria-label="${escapeHtml(selected ? reactionLabel+'：変更・解除' : reactionLabel)}" aria-expanded="false" title="${escapeHtml(reactionLabel)}">${selected?.[0] || '+'}</button>`
+    : !initial && selected ? `<span class="conversation-reaction-badge" title="${escapeHtml(reactionLabel)}" aria-label="${escapeHtml(reactionLabel)}">${selected[0]}</span>` : '';
   const header=initial ? '' : `<div class="conversation-card-header"><span class="conversation-author" title="${escapeHtml(authorName || message.author_employee_id)}">${escapeHtml(authorName || message.author_employee_id)}</span>${reaction}</div>`;
   return `<div class="conversation-card ${initial?'conversation-initial':'cell-frame reply-card'} ${own?'is-own':'is-partner'} ${message.author_employee_id===cell.superior_employee_id?'is-superior':'is-subordinate'} ${dirty?'is-dirty':''}" ${attrs} tabindex="0">${header}${content}</div>`;
 }
