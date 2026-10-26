@@ -671,6 +671,11 @@ html body .column-resize-handle.is-active::before {
   background: var(--text-muted);
 }
 
+/* Header handles touch the scrollport edges; draw focus inside their hit area. */
+html body .column-resize-handle:focus-visible {
+  outline-offset: -2px;
+}
+
 html body .column-resize-guide {
   position: fixed;
   z-index: 100;
@@ -1932,7 +1937,8 @@ html body #reportPanel .member-switch-button:active:not(:disabled) {
 
 html body #reportPanel .member-switch-button:focus-visible {
   outline: 2px solid var(--focus-ring);
-  outline-offset: 0;
+  /* Keep the keyboard ring inside the horizontal scrollport. */
+  outline-offset: -2px;
 }
 
 html body #reportPanel .member-switch-button:disabled {
@@ -2133,7 +2139,6 @@ html body #reportPanel td.self-comment-col:not(.comment-not-applicable):not(.is-
 
 /* Move the role emphasis into a compact label beside the boss name. */
 html body #reportPanel table thead th .column-header-you {
-  border: 1px solid var(--self-label-border);
   background: var(--self-label-bg);
   color: var(--self-label-fg);
 }
@@ -2195,7 +2200,6 @@ html body #reportPanel .date-today-label {
   margin-top: 3px;
   padding: 2px 6px 1px;
   border-radius: 4px;
-  border: 1px solid var(--self-label-border);
   background: var(--today-label-bg);
   color: var(--today-label-fg);
   font-size: var(--font-12);

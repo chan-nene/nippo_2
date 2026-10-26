@@ -513,7 +513,7 @@ function syncPeriodPresets(config = {}) {
   if ($("showHolidays")) $("showHolidays").disabled = controlsBusy;
   if ($("commentColumnButton")) {
     $("commentColumnButton").disabled = controlsBusy;
-    $("showAllCommentColumns").disabled = controlsBusy;
+    $("toggleAllCommentColumns").disabled = controlsBusy;
     $("commentColumnOptions").querySelectorAll("input").forEach(input => { input.disabled = controlsBusy; });
     if (controlsBusy) closeCommentColumnMenu();
   }
@@ -1590,10 +1590,17 @@ function setupCommentColumnControl() {
     else state.hiddenCommenterIds.add(input.dataset.commenterId);
     renderTable({ preserveScroll: true });
   });
-  $("showAllCommentColumns").addEventListener("click", () => {
+  $("toggleAllCommentColumns").addEventListener("click", () => {
     if (state.isBusy) return;
     finishEditing();
-    state.hiddenCommenterIds.clear();
+    const available = getApplicableCommentColumns(getFilteredRows());
+    const allVisible = available.every(cell =>
+      !state.hiddenCommenterIds.has(String(cell.superior_employee_id)));
+    available.forEach(cell => {
+      const id = String(cell.superior_employee_id);
+      if (allVisible) state.hiddenCommenterIds.add(id);
+      else state.hiddenCommenterIds.delete(id);
+    });
     renderTable({ preserveScroll: true });
   });
   document.addEventListener("click", (event) => {
@@ -1635,6 +1642,7 @@ function syncCommentColumnControl(rows) {
     input.disabled = state.isBusy;
     if (input.checked) visible++;
   });
+  $("toggleAllCommentColumns").textContent = visible === available.length ? "全OFF" : "全ON";
   $("commentColumnButton").textContent = `上司列：${visible === available.length ? "すべて" : `${visible}/${available.length}`} ▾`;
 }
 
