@@ -67,7 +67,7 @@ def validate_frame(df, owner, side):
             if r['message_id'] in ids: raise ValueError('メッセージIDが重複しています。')
             ids.add(r['message_id'])
             if r['message_kind'] not in ('initial_comment','reply') or (side=='user' and r['message_kind']!='reply'): raise ValueError('メッセージ種別が不正です。')
-            if r['message_kind']=='initial_comment':
+            if r['message_kind']=='initial_comment' and not r['deleted_at']:
                 t=thread(r,side)
                 if t in initials: raise ValueError('先頭コメントが重複しています。')
                 initials.add(t)
@@ -85,7 +85,7 @@ def project_users(df):
 
 
 def project_comments(df):
-    return df.where("record_type = 'message' AND message_kind = 'initial_comment'").with_column(
+    return df.where("record_type = 'message' AND message_kind = 'initial_comment' AND deleted_at = ''").with_column(
         'comment', "CASE WHEN deleted_at != '' THEN '' ELSE message_text END"
     ).with_column('comment_rich_text',
         "CASE WHEN deleted_at != '' THEN ? ELSE message_rich_text END", (EMPTY_RICH_TEXT,)
@@ -174,6 +174,7 @@ def save_partition(repo,owner,side,reports,ops,common,expected_revision):
             if action=='react':
                 target=next((r for r in remote if r['record_type']=='message' and r['message_id']==op['target_message_id'] and author(r,peer_side)==op['target_author_employee_id']),None)
                 if target is None or target['deleted_at']: raise ValueError('リアクション対象が存在しないか削除されています。')
+                if target['message_kind'] != 'reply': raise ValueError('初回コメントにはリアクションできません。')
                 prev=next((r for r in local if r['record_type']=='reaction' and r['target_message_id']==op['target_message_id'] and r['target_author_employee_id']==op['target_author_employee_id']),None)
                 if prev: rows.remove(prev)
                 if op['reaction_type']:
@@ -186,7 +187,7 @@ def save_partition(repo,owner,side,reports,ops,common,expected_revision):
                     if any(existing_message[k]!=op[k] for k in ('message_text','message_rich_text','created_at')) or existing_message['deleted_at']: raise ValueError('同じIDに異なる投稿が保存されています。')
                     continue
                 if op['message_kind']=='initial_comment':
-                    if side!='comment' or initial: raise ValueError('最初のコメントは上司が1件だけ作成できます。')
+                    if side!='comment' or any(r['record_type']=='message' and r['message_kind']=='initial_comment' and not r['deleted_at'] for r in [*local,*remote]): raise ValueError('最初のコメントは上司が1件だけ作成できます。')
                 elif initial is None: raise ValueError('最初の上司コメントがありません。')
                 base.update(record_type='message',message_id=op['message_id'],message_kind=op['message_kind'],message_text=op['message_text'],message_rich_text=op['message_rich_text'],created_at=op['created_at'],updated_at=op['created_at']);rows.append(base)
             else:

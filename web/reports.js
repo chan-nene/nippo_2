@@ -1774,7 +1774,7 @@ function renderReportNameCell(row) {
     editable: row.can_edit_report,
     showEmptyIcon: !row.is_holiday,
     editLabel: `${formatNavigationDate(row.date, true)}の業務名`,
-  })}</td>`;
+  })}<span class="cell-unsaved-marker" aria-hidden="true"></span></td>`;
 }
 
 function renderReportDetailCell(row) {
@@ -1787,7 +1787,7 @@ function renderReportDetailCell(row) {
     editable: row.can_edit_report,
     showEmptyIcon: !row.is_holiday,
     editLabel: `${formatNavigationDate(row.date, true)}の業務詳細`,
-  })}</td>`;
+  })}<span class="cell-unsaved-marker" aria-hidden="true"></span></td>`;
 }
 
 function renderReportTdClass(baseClass, row, field) {
@@ -2073,7 +2073,7 @@ function isReplyDirty(row, cell) {
 
 function isBossCommentDirty(row, cell) {
   if (state.commentChanges.has(getReplyKey(row, cell))) return true;
-  const initial = cell.messages?.find(message => message.message_kind === "initial_comment");
+  const initial = cell.messages?.find(message => message.message_kind === "initial_comment" && !message.deleted_at);
   return Boolean(initial && state.conversationChanges?.has(
     conversationDraftKey(messageOperation(row, cell, initial, initial.is_new ? "create" : "edit")),
   ));
@@ -2474,6 +2474,7 @@ function beginCellEditing(event) {
 }
 
 function getEditableTargetFromEvent(event) {
+  if (event.target.closest('.conversation-card-header')) return null;
   const directTarget = event.target.closest(".editable-content");
   if (directTarget instanceof HTMLElement) return directTarget;
 
@@ -2542,8 +2543,8 @@ function startEditingTarget(target, { preventScroll = false, pointer = false } =
       if (target.dataset.kind === "message") {
         const cell=row.comments[Number(target.dataset.comment)];
         recordMessageChange(row,cell,message,text,document);
-        target.closest("td")?.querySelector(".boss-comment-actions")?.classList.toggle("hidden",Boolean(text.trim()));
-        const dirty = state.conversationChanges.has(conversationDraftKey(messageOperation(row,cell,message,message.is_new?'create':'edit')));
+        target.closest("td")?.querySelector(".boss-comment-actions")?.classList.toggle("hidden",!canSignConversation(cell));
+        const dirty = isConversationMessageDirty(row,cell,message);
         target.closest(".conversation-card")?.classList.toggle("is-dirty", dirty);
         target.classList.toggle("is-dirty", dirty);
       } else if (target.dataset.kind === "report") {
@@ -2575,7 +2576,7 @@ function cancelEditing() {
     if(snapshot.messageDraft)state.conversationChanges.set(snapshot.messageDraftKey,snapshot.messageDraft);
     else state.conversationChanges.delete(snapshot.messageDraftKey);
     syncConversationInitial(snapshot.commentCell);
-    editingElement.closest(".conversation-card")?.classList.toggle("is-dirty", Boolean(snapshot.messageDraft));
+    editingElement.closest(".conversation-card")?.classList.toggle("is-dirty", isConversationMessageDirty(snapshot.row,snapshot.commentCell,snapshot.message));
   }
   if (snapshot?.row) {
     if (snapshot.kind === "report") { snapshot.row[snapshot.field] = snapshot.originalValue; snapshot.row[RICH_FIELD_NAMES[snapshot.field]] = snapshot.originalRich; }
@@ -2687,6 +2688,9 @@ function finishEditing() {
   }
   richSelectionDrag = null;
   discardEmptyNewReply(element);
+  if(data.kind==='message' && cell) {
+    element.closest('td')?.querySelector?.('.boss-comment-actions')?.classList.toggle('hidden',!canSignConversation(cell));
+  }
   currentEditingElement=null;
   editingSnapshot=null;
 }
@@ -3077,18 +3081,11 @@ async function saveUpdates() {
   let displayUpdateFailed = result?.cache_sync_failed === true;
 
   if (anySaved) {
-    for(const {key,op} of conversationEntries) {
+    finishEditing();
+    for(const {op} of conversationEntries) {
       const saved=op.subordinate_employee_id===state.employeeId ? userSaved : commentSaved;
       if (!saved) continue;
-      const current = state.conversationChanges.get(key);
-      if (JSON.stringify(current) === JSON.stringify(op)) {
-        state.conversationChanges.delete(key);
-      } else if (op.action === 'create' && current?.action === 'create') {
-        // The submitted UUID now exists: retain newer typing as an edit, not a second create.
-        const pending = {...current, action: 'edit'};
-        delete pending.created_at;
-        state.conversationChanges.set(key, pending);
-      }
+      commitSavedConversationOperation(op);
     }
     try {
       if (reportChangesSaved) {

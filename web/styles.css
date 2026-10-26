@@ -1668,7 +1668,7 @@ html body :where(
     a,
     span,
     .cell-frame:not(:has(> *))
-  ):not(:has(> *)):not(:empty):not([aria-hidden="true"]):not(.toolbar-button-icon):not(.sidebar-icon):not(.sidebar-utility-icon) {
+  ):not(:has(> *)):not(:empty):not([aria-hidden="true"]):not(.toolbar-button-icon):not(.sidebar-icon):not(.sidebar-utility-icon):not(:where(.conversation-reaction-badge)) {
   position: relative;
   top: var(--ui-text-offset-y);
 }

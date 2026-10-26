@@ -880,19 +880,9 @@ html body #reportPanel td:has(.is-editing) .editing-textarea {
   background: transparent;
 }
 
-html body td.is-dirty-cell,
-html body .editable-content.is-dirty,
-html body .editable-content.is-dirty.is-editing .editing-textarea {
-  background: var(--dirty);
-}
-
 html body td.is-dirty-cell .editable-content,
 html body td.is-dirty-cell .editing-textarea {
   background: transparent;
-}
-
-html body tr.holiday td.is-dirty-cell:not(.date-col) {
-  background: var(--dirty);
 }
 
 html body .comment-stack {
@@ -908,19 +898,20 @@ html body .boss-comment-actions {
   position: absolute;
   width: auto;
   min-height: 0;
+  top: 0;
   bottom: 0;
   right: 0;
   z-index: 1;
   opacity: 0;
   pointer-events: none;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: flex-end;
   gap: 6px;
-  padding: 0 6px 2px;
+  padding: 3px 6px;
 }
 
-html body td:hover .boss-comment-actions,
+html body td:is(:hover, :focus-within) .boss-comment-actions,
 html body .boss-comment-actions:focus-within {
   opacity: 1;
   pointer-events: auto;
@@ -930,8 +921,8 @@ html body .boss-comment-link {
   display: inline-flex;
   width: auto;
   min-width: 0;
-  height: 22px;
-  min-height: 0;
+  height: auto;
+  min-height: 22px;
   font-family: var(--font-ui);
   font-size: var(--font-12);
   line-height: 16px;
@@ -992,10 +983,12 @@ html body .reply-section {
 }
 
 html body .reply-section.is-collapsed {
+  /* Anchored to the positioned table cell, not to the last card. */
   position: absolute;
-  /* Keep the reply action above the reaction badge (z-index: 12). */
+  display: flex;
+  /* Keep the cell action above card content. */
   z-index: 13;
-  bottom: 6px;
+  bottom: 2px;
   right: 8px;
   width: auto;
   min-width: 0;
@@ -1005,12 +998,19 @@ html body .reply-section.is-collapsed {
   pointer-events: none;
 }
 
-/* Reserve a bottom action row, separate from every message card. */
-html body .comment-stack:has(> .reply-section.is-collapsed) {
-  padding-bottom: 34px;
+/* The cell reply action overlays the text without reserving layout space. */
+html body .reply-section.is-collapsed .reply-toggle-button {
+  width: 32px;
+  min-width: 32px;
+  height: 20px;
+  min-height: 20px;
+  background: var(--surface);
+  color: var(--action-secondary-hover-fg);
+  border-color: var(--primary-border);
+  box-shadow: 0 2px 5px #0003;
 }
 
-html body td:hover:not(:has(.is-editing)) .reply-section.is-collapsed {
+html body td:is(:hover, :focus-within):not(:has(.is-editing)) .reply-section.is-collapsed {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -1072,10 +1072,6 @@ html body .reply-card:has(.reply-content.is-editable):not(:has(.is-editing)):hov
 
 html body .reply-card:has(.reply-content.is-editing) {
   box-shadow: inset 0 0 0 2px var(--primary);
-}
-
-html body #reportPanel .reply-card:has(.reply-content.is-dirty) {
-  background: var(--dirty);
 }
 
 html body .empty {
@@ -1585,7 +1581,6 @@ html body #reportPanel table tbody th.user-col {
   background: var(--table-header-bg);
 
 }
-
 
 /* Emphasize boundaries between people, not the bottom edge of the table. */
 html body #reportPanel table tbody tr:has(~ tr.member-group-start) > th.user-col,
@@ -2265,35 +2260,74 @@ html body #reportPanel .date-value > span {
 
 /* Message cards share the existing reply geometry. Initial comments stay embedded. */
 html body .conversation-card { position: relative; min-width: 0; }
-html body .conversation-card.reply-card { margin: 6px 8px; width: auto; display: block; }
-html body .conversation-initial { background: transparent; }
-/* Selected reactions occupy their own line below the message text. */
-html body #reportPanel .conversation-reaction {
-  position: static;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26.4px;
-  height: 18px;
-  margin: 0 0 0 auto;
-  padding: 0;
-  line-height: 1;
-  font-size: 14.4px;
-  border: 1px solid var(--border-strong);
-  border-radius: 11px;
-  background: transparent;
-}
-html body #reportPanel .conversation-initial > .conversation-reaction {
-  margin-right: 8px;
+html body .conversation-card.reply-card { margin: 6px 8px; width: auto; display: block; padding-top: 4px; }
+/* Adjacent cards: 0px bottom margin + 5px grid gap + 3px top margin. */
+html body .conversation-card.reply-card:has(+ .conversation-card.reply-card) {
   margin-bottom: 0;
 }
-/* Tighten only the space around an existing reaction row. */
-html body #reportPanel .conversation-initial:has(> .conversation-reaction) > .boss-content:not(.is-editing) {
-  padding-bottom: 2px;
+html body .conversation-card.reply-card + .conversation-card.reply-card {
+  margin-top: 3px;
 }
-html body #reportPanel .conversation-card.reply-card:has(> .conversation-reaction) {
-  padding-bottom: 2px;
+html body .conversation-card.reply-card:not(:has(~ .conversation-card)) {
+  margin-bottom: 9px;
 }
+/* Keep the initial comment marker anchored to the table cell. */
+html body .conversation-initial { position: static; background: transparent; }
+html body .conversation-card-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 14px;
+  margin-bottom: 4px;
+}
+html body .conversation-card-header:has(.conversation-reaction-toggle, .conversation-reaction-badge) {
+  padding-right: 22px;
+}
+html body .conversation-author {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.8em;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html body .conversation-reaction-toggle,
+html body .conversation-reaction-badge {
+  display: inline-flex;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 24px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 30%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: color-mix(in srgb, var(--text-muted) 80%, transparent);
+  font-size: 14px;
+  line-height: 1;
+}
+html body .conversation-reaction-toggle { cursor: pointer; }
+html body .conversation-reaction-toggle:is(:hover, :focus-visible, [aria-expanded="true"]) {
+  color: var(--text-muted);
+  border-color: color-mix(in srgb, var(--text-muted) 55%, transparent);
+  background: color-mix(in srgb, var(--text-muted) 8%, transparent);
+}
+html body .conversation-reaction-toggle:focus-visible {
+  outline: 1px solid var(--text-muted);
+  outline-offset: 2px;
+}
+html body .conversation-reaction-toggle.has-reaction,
+html body .conversation-reaction-badge {
+  border-color: transparent;
+}
+html body .conversation-card:has(.is-editing) .conversation-reaction-toggle { visibility: hidden; }
 html body .conversation-float-menu { position: fixed; z-index: 310; display: flex; padding: 4px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 3px 12px #0003; }
 html body .conversation-float-menu[hidden] { display: none; }
 html body .conversation-float-menu button { width: 36px; height: 32px; border: 0; border-radius: 4px; background: transparent; cursor: pointer; font-size: 20px; }
@@ -2317,9 +2351,28 @@ html body .comment-stack:has(> .conversation-initial .boss-content.is-editing) >
   pointer-events: none;
 }
 
-/* Unsaved text uses the same background as report cells, regardless of author color. */
-html body #reportPanel .conversation-card.reply-card.is-dirty:is(.is-superior, .is-subordinate),
-html body #reportPanel .conversation-card.reply-card.is-dirty:is(.is-superior, .is-subordinate):hover,
-html body #reportPanel .conversation-initial.is-dirty {
-  background: var(--dirty);
+/* Dedicated report markers leave td::after available for hover/edit outlines. */
+html body .cell-unsaved-marker { display: none; }
+/* Unsaved markers overlay existing geometry; they never reserve space. */
+html body #reportPanel td.is-dirty-cell > .cell-unsaved-marker,
+html body #reportPanel .conversation-initial.is-dirty::after,
+html body #reportPanel .conversation-card.reply-card.is-dirty::after {
+  content: "";
+  display: block;
+  position: absolute;
+  inset: auto;
+  top: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--danger-primary-bg);
+  box-shadow: none;
+  z-index: 15;
+  pointer-events: none;
+}
+html body #reportPanel .conversation-card.reply-card.is-dirty::after {
+  top: -6px;
+  right: 1px;
 }
