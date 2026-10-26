@@ -70,6 +70,7 @@ const state = {
   colorPalette: document.documentElement.dataset.colorPalette || "blue",
   fontSize: "standard",
   columnWidths: {},
+  hiddenCommenterIds: new Set(),
   memberFilterLevels: [],
   memberFilterAllowedLevels: null,
   settingsContext: {
@@ -432,6 +433,7 @@ function bindEvents() {
   initializePeriodPresetControl();
 
   setupConversationUi();
+  setupCommentColumnControl();
   $("showHolidays")?.addEventListener("change", () => {
     finishEditing();
     state.showHolidays = $("showHolidays").checked;

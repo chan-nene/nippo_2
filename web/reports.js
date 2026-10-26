@@ -511,6 +511,12 @@ function movePeriodPresetFocus(index) {
 function syncPeriodPresets(config = {}) {
   const controlsBusy = state.isBusy && state.busyAction !== "save";
   if ($("showHolidays")) $("showHolidays").disabled = controlsBusy;
+  if ($("commentColumnButton")) {
+    $("commentColumnButton").disabled = controlsBusy;
+    $("showAllCommentColumns").disabled = controlsBusy;
+    $("commentColumnOptions").querySelectorAll("input").forEach(input => { input.disabled = controlsBusy; });
+    if (controlsBusy) closeCommentColumnMenu();
+  }
   $("reportPanel")?.classList.toggle(
     "is-missing-mode",
     state.showMissingCommentsOnly,
@@ -1441,6 +1447,7 @@ function renderTable({ preserveScroll = false } = {}) {
   const scrollState = preserveScroll ? captureTableScrollState(wrap) : null;
   disposeReportTableRender();
   const rows = getFilteredRows();
+  syncCommentColumnControl(rows);
   if (!rows.length) {
     wrap.innerHTML = `<div class="empty">${escapeHtml(getEmptyMessage())}</div>`;
     return;
@@ -1549,13 +1556,86 @@ function restoreTableScrollState(wrap, scrollState) {
 }
 
 function createTableRenderContext(rows) {
-  const sampleComments = getApplicableCommentColumns(rows);
+  const availableComments = getApplicableCommentColumns(rows);
+  const sampleComments = availableComments.filter((cell) =>
+    state.memberScope === "self" || !state.hiddenCommenterIds?.has(String(cell.superior_employee_id)));
 
   return {
     sampleComments,
     commenterIds: sampleComments.map((cell) => cell.superior_employee_id),
-    columns: createTableColumnDefinitions(sampleComments),
+    columns: createTableColumnDefinitions(availableComments).filter((column, index) =>
+      column.kind !== "comment" || sampleComments.includes(availableComments[index - 4])),
   };
+}
+
+function closeCommentColumnMenu() {
+  $("commentColumnMenu").classList.add("hidden");
+  $("commentColumnButton").setAttribute("aria-expanded", "false");
+}
+
+function setupCommentColumnControl() {
+  const control = $("commentColumnControl");
+  const button = $("commentColumnButton");
+  button.addEventListener("click", () => {
+    finishEditing();
+    const open = button.getAttribute("aria-expanded") !== "true";
+    $("commentColumnMenu").classList.toggle("hidden", !open);
+    button.setAttribute("aria-expanded", String(open));
+  });
+  $("commentColumnOptions").addEventListener("change", (event) => {
+    const input = event.target.closest("input[data-commenter-id]");
+    if (!input || state.isBusy) return;
+    finishEditing();
+    if (input.checked) state.hiddenCommenterIds.delete(input.dataset.commenterId);
+    else state.hiddenCommenterIds.add(input.dataset.commenterId);
+    renderTable({ preserveScroll: true });
+  });
+  $("showAllCommentColumns").addEventListener("click", () => {
+    if (state.isBusy) return;
+    finishEditing();
+    state.hiddenCommenterIds.clear();
+    renderTable({ preserveScroll: true });
+  });
+  document.addEventListener("click", (event) => {
+    if (!control.contains(event.target)) closeCommentColumnMenu();
+  });
+  control.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeCommentColumnMenu();
+      button.focus();
+    }
+  });
+  control.addEventListener("focusout", (event) => {
+    // Label text/padding briefly blurs the button before the label focuses
+    // its checkbox. Outside pointer clicks are handled by the click listener.
+    if (event.relatedTarget && !control.contains(event.relatedTarget)) closeCommentColumnMenu();
+  });
+}
+
+function syncCommentColumnControl(rows) {
+  const control = $("commentColumnControl");
+  if (!control) return;
+  const available = getApplicableCommentColumns(rows);
+  const enabled = state.isSuperior && state.memberScope !== "self" && available.length > 0;
+  control.classList.toggle("hidden", !enabled);
+  if (!enabled) closeCommentColumnMenu();
+  const options = $("commentColumnOptions");
+  const signature = JSON.stringify(available.map(cell => [String(cell.superior_employee_id), cell.superior_name]));
+  if (options.dataset.signature !== signature) {
+    options.innerHTML = available.map(cell => {
+      const id = String(cell.superior_employee_id);
+      return `<label><input type="checkbox" data-commenter-id="${escapeHtml(id)}"><span>${escapeHtml(cell.superior_name)}${id === String(state.employeeId) ? "（自分）" : ""}</span></label>`;
+    }).join("");
+    options.dataset.signature = signature;
+  }
+  let visible = 0;
+  options.querySelectorAll("input").forEach(input => {
+    input.checked = !state.hiddenCommenterIds.has(input.dataset.commenterId);
+    input.disabled = state.isBusy;
+    if (input.checked) visible++;
+  });
+  $("commentColumnButton").textContent = `上司列：${visible === available.length ? "すべて" : `${visible}/${available.length}`} ▾`;
 }
 
 function getApplicableCommentColumns(rows) {

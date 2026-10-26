@@ -55,16 +55,18 @@ test_data/
 └─ common_data/
 ```
 
-プロジェクトのルートフォルダでPowerShellを開き、まず検証だけ実行します。以下は、セットアップ済みの `.venv` を使用する例です。
+`convert_csv.py` だけを配布して実行できます。Python 3.10以降が必要ですが、追加パッケージや `app/`・`tools/`、アプリのインストールは不要です。
+
+ファイルを置いたフォルダでPowerShellを開き、まず検証だけ実行します。
 
 ```powershell
-.\.venv\Scripts\python.exe .\convert_csv.py --source .\test_data --output .\converted_v4
+python .\convert_csv.py --source .\test_data --output .\converted_v4
 ```
 
 エラーがないことを確認したら、`--write` を付けて実際に出力します。
 
 ```powershell
-.\.venv\Scripts\python.exe .\convert_csv.py --source .\test_data --output .\converted_v4 --write
+python .\convert_csv.py --source .\test_data --output .\converted_v4 --write
 ```
 
 | 引数 | 意味 |
