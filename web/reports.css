@@ -3,6 +3,7 @@
 /* Command bar */
 
 html body #reportPanel {
+  --table-divider-border: color-mix(in srgb, var(--table-border) 80%, var(--border-strong));
   --weekday-sat: #2563eb;
   --weekday-sun: var(--danger-icon);
   --report-regular-row-height: 58px;
@@ -1581,16 +1582,19 @@ html body #reportPanel table tbody th.user-col {
   border-left: 1px solid var(--table-border);
 }
 
-/* Match member labels to the header; separate members across the whole table. */
+/* Use the regular cell surface for names and emphasize the column boundary. */
 html body #reportPanel table tbody th.user-col {
-  background: var(--table-header-bg);
+  background: var(--table-cell-bg);
+}
 
+html body #reportPanel table th.user-col {
+  border-right: 2px solid var(--table-divider-border);
 }
 
 /* Emphasize boundaries between people, not the bottom edge of the table. */
 html body #reportPanel table tbody tr:has(~ tr.member-group-start) > th.user-col,
 html body #reportPanel table tbody tr.member-group-end:not(:last-child) > td {
-  border-bottom: 2px solid var(--table-border);
+  border-bottom: 2px solid var(--table-divider-border);
 }
 
 html body #reportPanel table tbody tr.member-group-start > :is(th, td) {

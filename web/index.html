@@ -12,8 +12,8 @@
     <link rel="stylesheet" href="./fonts.css?v=20260921-01" />
 
     <link rel="stylesheet" href="./styles.css?v=20261024-15" />
-    <link rel="stylesheet" href="./reports.css?v=20261026-13" />
-    <link rel="stylesheet" href="./settings.css?v=20261026-01" />
+    <link rel="stylesheet" href="./reports.css?v=20261026-15" />
+    <link rel="stylesheet" href="./settings.css?v=20261026-02" />
     <link rel="stylesheet" href="./admin.css?v=20261020-02" />
     <link rel="stylesheet" href="./vendor/flatpickr.min.css?v=20260830-18" />
     <link rel="stylesheet" href="./vendor/tabulator.min.css?v=20260830-18" />
@@ -61,7 +61,8 @@
             <button id="fitColumnWidthsButton" class="font-size-menu-reset" type="button">
               列幅を画面に合わせる
             </button>
-            <button id="resetColumnWidthsButton" class="font-size-menu-reset" type="button">
+            <!-- Temporarily unavailable in the UI; retain the reset implementation. -->
+            <button id="resetColumnWidthsButton" class="font-size-menu-reset hidden" type="button" hidden disabled>
               列幅を初期値に戻す
             </button>
           </div>
@@ -606,7 +607,7 @@
                   <div class="settings-field settings-control-field">
                     <div class="settings-field-label">直近ボタンの表示範囲</div>
                     <div class="default-range-selects">
-                      <span>本日を起点に</span>
+                      <!--<span>本日を起点に</span>-->
                       <label>
                         <select id="defaultStartOffsetDays" aria-label="表示範囲の開始日">
                           <option value="5">5稼働日前</option>
@@ -628,7 +629,7 @@
                           <option value="5">5稼働日後</option>
                         </select>
                       </label>
-                      <span>の範囲を表示</span>
+                      <!--<span>の範囲を表示</span>-->
                     </div>
                   </div>
                   <div class="settings-field settings-control-field">
@@ -655,13 +656,12 @@
                   </div>
                   <div id="commentFeatureSettings" class="settings-section-body">
                     <label class="settings-field settings-signature-field">
-                      <span>サインボタン押下時に入力する文字</span>
+                      <span>サインボタン押下時に入力する文字 <span class="settings-inline-note">（空欄の場合は名前が入力されます）</span></span>
                       <input
                         id="commentSignature"
                         type="text"
                         maxlength="100"
                         autocomplete="off"
-                        placeholder="空欄の場合は名前が入力されます"
                       />
                     </label>
                     <div class="settings-field settings-date-field">
@@ -676,11 +676,11 @@
                         </div>
                         <label class="settings-check-option">
                           <input id="includeTodayInMissingComments" type="checkbox" />
-                          <span class="settings-check-copy">当日分を未コメントの表示対象にする<span class="settings-check-note">当日の日報を夜に確認される人はONにしてください</span></span>
+                          <span class="settings-check-copy">当日の日報を未コメントの表示対象にする<span class="settings-check-note">当日の日報を夜に確認する方はチェックしてください</span></span>
                         </label>
                         <label class="settings-check-option">
                           <input id="includeEmptyReportDaysInMissingComments" type="checkbox" checked />
-                          <span class="settings-check-copy">部下の日報が空欄の日を未コメントの表示対象にする<span class="settings-check-note">日報が空欄であってもサインされる人はONにしてください</span></span>
+                          <span class="settings-check-copy">空欄の日報を未コメントの表示対象にする<span class="settings-check-note">空欄の日報にもサインする方はチェックしてください</span></span>
                         </label>
                       </div>
                     </div>
