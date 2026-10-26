@@ -12,8 +12,8 @@
     <link rel="stylesheet" href="./fonts.css?v=20260921-01" />
 
     <link rel="stylesheet" href="./styles.css?v=20261024-15" />
-    <link rel="stylesheet" href="./reports.css?v=20261026-06" />
-    <link rel="stylesheet" href="./settings.css?v=20261018-01" />
+    <link rel="stylesheet" href="./reports.css?v=20261026-13" />
+    <link rel="stylesheet" href="./settings.css?v=20261026-01" />
     <link rel="stylesheet" href="./admin.css?v=20261020-02" />
     <link rel="stylesheet" href="./vendor/flatpickr.min.css?v=20260830-18" />
     <link rel="stylesheet" href="./vendor/tabulator.min.css?v=20260830-18" />
@@ -287,7 +287,7 @@
                 </div>
                 <div class="toolbar-right">
                   <div id="commentColumnControl" class="comment-column-control hidden">
-                    <button id="commentColumnButton" class="toolbar-button" type="button" aria-expanded="false" aria-controls="commentColumnMenu">上司列：すべて ▾</button>
+                    <button id="commentColumnButton" class="comment-column-button" type="button" aria-expanded="false" aria-controls="commentColumnMenu">上司列 ▾</button>
                     <div id="commentColumnMenu" class="comment-column-menu hidden" role="group" aria-label="表示する上司">
                       <div class="comment-column-heading">表示する上司</div>
                       <div id="commentColumnOptions" class="comment-column-options"></div>
@@ -604,7 +604,7 @@
                 <h2 id="settingsFeatureTitle">機能</h2>
                 <div class="settings-section-body">
                   <div class="settings-field settings-control-field">
-                    <div class="settings-field-label">「直近」の表示範囲</div>
+                    <div class="settings-field-label">直近ボタンの表示範囲</div>
                     <div class="default-range-selects">
                       <span>本日を起点に</span>
                       <label>
@@ -655,33 +655,32 @@
                   </div>
                   <div id="commentFeatureSettings" class="settings-section-body">
                     <label class="settings-field settings-signature-field">
-                      <span>サインの文字</span>
+                      <span>サインボタン押下時に入力する文字</span>
                       <input
                         id="commentSignature"
                         type="text"
                         maxlength="100"
                         autocomplete="off"
-                        placeholder="未設定の場合は上司名を使用"
+                        placeholder="空欄の場合は名前が入力されます"
                       />
                     </label>
                     <div class="settings-field settings-date-field">
                       <label class="settings-field-label" for="missingCommentStartDate">未コメントの集計開始日</label>
                       <div class="settings-missing-controls">
                         <div class="period-field-group flatpickr-date-field">
-                          <input id="missingCommentStartDate" type="date" aria-describedby="missingCommentRangeHelp" aria-label="未コメントの集計開始日" />
+                          <input id="missingCommentStartDate" type="date" aria-label="未コメントの集計開始日" />
                           <svg class="period-field-display-icon" viewBox="0 0 24 24" aria-hidden="true">
                             <rect x="4" y="5" width="16" height="15" rx="2" />
                             <path d="M8 3v4M16 3v4M4 10h16" />
                           </svg>
                         </div>
-                        <p id="missingCommentRangeHelp" class="settings-field-help">未コメント集計は過去1年（当日を含め最大366日）のみです。それ以前の日付は、集計開始日に設定しても集計されません。</p>
                         <label class="settings-check-option">
                           <input id="includeTodayInMissingComments" type="checkbox" />
-                          <span class="settings-check-copy">当日分を未コメントに含める</span>
+                          <span class="settings-check-copy">当日分を未コメントの表示対象にする<span class="settings-check-note">当日の日報を夜に確認される人はONにしてください</span></span>
                         </label>
                         <label class="settings-check-option">
                           <input id="includeEmptyReportDaysInMissingComments" type="checkbox" checked />
-                          <span class="settings-check-copy">日報未記入日を未コメントに含める <span class="settings-check-note">（日報が空欄でもサインしたい人はONにしてください）</span></span>
+                          <span class="settings-check-copy">部下の日報が空欄の日を未コメントの表示対象にする<span class="settings-check-note">日報が空欄であってもサインされる人はONにしてください</span></span>
                         </label>
                       </div>
                     </div>
@@ -760,7 +759,7 @@
     <script src="vendor/l10n/ja.js?v=20260830-18"></script>
     <script src="vendor/tabulator.min.js?v=20260830-18"></script>
     <script src="rich-text.js?v=20261017-01"></script>
-    <script src="reports.js?v=20261026-04"></script>
+    <script src="reports.js?v=20261026-05"></script>
     <script src="conversations.js?v=20261026-01"></script>
     <script src="settings.js?v=20260919-02"></script>
     <script src="vendor/Sortable.min.js?v=20260830-18"></script>

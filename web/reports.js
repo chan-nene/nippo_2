@@ -1643,7 +1643,7 @@ function syncCommentColumnControl(rows) {
     if (input.checked) visible++;
   });
   $("toggleAllCommentColumns").textContent = visible === available.length ? "全OFF" : "全ON";
-  $("commentColumnButton").textContent = `上司列：${visible === available.length ? "すべて" : `${visible}/${available.length}`} ▾`;
+  $("commentColumnButton").textContent = `上司列${visible === available.length ? "" : ` ${visible}/${available.length}`} ▾`;
 }
 
 function getApplicableCommentColumns(rows) {

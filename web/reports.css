@@ -1590,7 +1590,7 @@ html body #reportPanel table tbody th.user-col {
 /* Emphasize boundaries between people, not the bottom edge of the table. */
 html body #reportPanel table tbody tr:has(~ tr.member-group-start) > th.user-col,
 html body #reportPanel table tbody tr.member-group-end:not(:last-child) > td {
-  border-bottom: 2px solid var(--border-strong);
+  border-bottom: 2px solid var(--table-border);
 }
 
 html body #reportPanel table tbody tr.member-group-start > :is(th, td) {
@@ -1990,6 +1990,20 @@ html body #reportPanel .toolbar-right > .toolbar-button {
 
 /* Keep period actions and save controls on the same row at the minimum window width. */
 @media (max-width: 1100px) {
+  html body #reportPanel .period-mode-control { flex-shrink: 0; }
+  html body #reportPanel .period-presets > .preset-button { padding-inline: 6px; }
+  html body #reportPanel .period-main-controls,
+  html body #reportPanel .toolbar-right { gap: 6px; }
+  html body #reportPanel .period-date-range {
+    display: block;
+    min-width: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: var(--control-height);
+  }
+
   html body #reportPanel .toolbar-filter-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -2237,17 +2251,39 @@ html body #reportPanel.is-missing-mode .period-date-range {
 
 /* Keep holiday visibility anchored to the right-hand action group. */
 html body .holiday-visibility-control {
+  --ui-text-offset-y: 2px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
   cursor: pointer;
   color: var(--text);
+  margin-right: 48px;
+  height: var(--control-height);
+  line-height: 1.5;
 }
 html body .holiday-visibility-control input { margin: 0; accent-color: var(--primary); }
 
-.comment-column-control { position: relative; flex-shrink: 0; }
-.comment-column-control > button { white-space: nowrap; }
+.comment-column-control { position: relative; display: flex; align-items: center; flex-shrink: 0; }
+html body .comment-column-button {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-height);
+  /* Lower only the text by 2px without moving the control. */
+  padding: 4px 4px 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+}
+html body .comment-column-button:is(:hover, :focus-visible) {
+  background: var(--surface-hover);
+}
+html body .comment-column-button:disabled { cursor: default; opacity: 0.5; }
 .comment-column-menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -2288,6 +2324,10 @@ html body #reportPanel .date-value > span {
 /* Message cards share the existing reply geometry. Initial comments stay embedded. */
 html body .conversation-card { position: relative; min-width: 0; }
 html body .conversation-card.reply-card { margin: 6px 8px; width: auto; display: block; padding-top: 4px; }
+/* Keep the first reply close to the embedded initial comment. */
+html body .conversation-initial + .conversation-card.reply-card {
+  margin-top: 0;
+}
 /* Adjacent cards: 0px bottom margin + 5px grid gap + 3px top margin. */
 html body .conversation-card.reply-card:has(+ .conversation-card.reply-card) {
   margin-bottom: 0;

@@ -54,6 +54,11 @@ html body .settings-section-body {
   gap: 18px;
 }
 
+/* Separate the four feature settings while keeping their options grouped. */
+html body #settingsFeaturePanel .settings-section-body {
+  gap: 30px;
+}
+
 html body .settings-section,
 html body #settingsPanel .settings-card > .actions {
   max-width: 646px;
@@ -439,7 +444,7 @@ html body #settingsPanel .period-field-group:has(input:focus-visible) {
 html body .settings-card .settings-check-option {
   display: inline-flex;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   gap: 9px;
   margin: 0;
   color: var(--text);
@@ -509,6 +514,8 @@ html body .settings-field-help {
 }
 
 html body .settings-check-copy .settings-check-note {
+  display: block;
+  margin-top: 3px;
   color: var(--text-muted);
   font-size: var(--font-12);
   font-weight: 400;
