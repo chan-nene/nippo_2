@@ -3193,9 +3193,9 @@ async function saveUpdates() {
       commentEntries.forEach((entry) => commitSavedCommentEntry(entry));
     }
     try {
-      if (commentChangesSaved || conversationEntries.length) {
+      if (allSaved || commentChangesSaved || conversationEntries.length) {
         let refreshResult;
-        if (!conversationEntries.length && result.review_patch && !result.cache_sync_failed) {
+        if (!allSaved && !conversationEntries.length && result.review_patch && !result.cache_sync_failed) {
           applySavedReviewPatch(result.review_patch);
           refreshResult = { ok: true };
           syncChrome();
@@ -3205,9 +3205,12 @@ async function saveUpdates() {
             silent: true,
             preserveDirty: true,
             preserveTableScroll: true,
+            // 保存結果を確定した後、更新ボタンと同じファイル単位の変更確認を行う。
+            // 保存中に追加された下書きは破棄しない。
+            forceRefresh: allSaved,
           });
         }
-        if (refreshResult?.ok !== true) {
+        if (refreshResult?.ok !== true || refreshResult.partial) {
           displayUpdateFailed = true;
           syncChrome();
           renderTable({ preserveScroll: true });
@@ -3222,7 +3225,7 @@ async function saveUpdates() {
             preserveDirty: true,
             preserveTableScroll: true,
           });
-          if (restoredResult?.ok !== true) displayUpdateFailed = true;
+          if (restoredResult?.ok !== true || restoredResult.partial) displayUpdateFailed = true;
         }
       } else {
         syncChrome();

@@ -4,6 +4,7 @@ import hashlib
 import json
 from app import conversations as conversation
 from contextlib import contextmanager
+from dataclasses import dataclass
 import logging
 import os
 import shutil
@@ -23,6 +24,7 @@ from app.config import StorageConfigError
 from app.security import (
     COMMON_MASTER_COLUMNS,
     USER_MASTER_DEFAULTS,
+    RequestValidationError,
     safe_employee_csv_path,
     validate_employee_id,
 )
@@ -48,6 +50,10 @@ class CommonMasterConflictError(RuntimeError):
     """The common CSV changed after it was loaded in the admin screen."""
 
 
+class AdministrationAccessDeniedError(PermissionError):
+    """The current management data does not grant administrator access."""
+
+
 class ReportConflictError(RuntimeError):
     """読み込み後に社員CSVが変更されたため、上書きを拒否した。"""
 
@@ -64,6 +70,18 @@ class CsvReadonlyError(OSError):
     """The final read-only protection flag could not be applied."""
 
 
+@dataclass(frozen=True)
+class VerifiedPartition:
+    """保存検証で読んだ内容と、その同じファイルハンドルから取得した更新情報。"""
+
+    path: Path
+    kind: str
+    employee_id: str
+    frame: Table
+    fingerprint: tuple[int, int] | None
+    revision: str = ""
+
+
 class DailyReportRepository:
     def __init__(self, settings: AppSettings, base_dir: Path) -> None:
         self.defer_partition_normalization = False
@@ -74,6 +92,7 @@ class DailyReportRepository:
         self.loaded_common_revisions: dict[str, str] = {}
         self.loaded_report_revisions: dict[str, str] = {}
         self.loaded_report_fingerprints: dict[str, tuple[int, int]] = {}
+        self.loaded_comment_fingerprints: dict[str, tuple[int, int]] = {}
 
     @staticmethod
     def now_jst() -> datetime:
@@ -119,19 +138,15 @@ class DailyReportRepository:
         return self.settings.storage_dir(kind)
 
     def load_common(self) -> dict[str, list[dict[str, Any]]]:
-        common_dir = self.storage_dir("common")
-        users, teams, assignments, schema_mode = self._load_organization_masters(
-            common_dir
-        )
-        return {
-            "user_master": users,
-            "team_master": teams,
-            "comment_assignment": assignments,
-            "calendar": self._load_calendar(common_dir),
-            "organization_schema": [{"mode": schema_mode}],
-        }
+        common = self.load_organization_masters()
+        common["calendar"] = self._load_calendar(self.storage_dir("common"))
+        return common
 
     def load_common_masters(self) -> dict[str, list[dict[str, Any]]]:
+        return self.load_common()
+
+    def load_organization_masters(self) -> dict[str, list[dict[str, Any]]]:
+        """Read organization data without accessing the holiday calendar."""
         common_dir = self.storage_dir("common")
         users, teams, assignments, schema_mode = self._load_organization_masters(
             common_dir
@@ -140,7 +155,6 @@ class DailyReportRepository:
             "user_master": users,
             "team_master": teams,
             "comment_assignment": assignments,
-            "calendar": self._load_calendar(common_dir),
             "organization_schema": [{"mode": schema_mode}],
         }
 
@@ -210,11 +224,14 @@ class DailyReportRepository:
 
     def _load_calendar(self, common_dir: Path) -> list[dict[str, Any]]:
         path = common_dir / "calendar.csv"
+        self.loaded_common_revisions["calendar"] = ""
         if not path.exists():
+            self.loaded_common_revisions["calendar"] = "missing"
             self._record_load_warning(path, FileNotFoundError("ファイルがありません"))
             return []
         try:
-            source = self._read_csv_frame(path)
+            raw = path.read_bytes()
+            source = self._read_csv_bytes(raw)
         except Exception as exc:
             self._record_load_warning(path, exc)
             return []
@@ -230,6 +247,7 @@ class DailyReportRepository:
                 continue
             seen.add(date_text)
             dates.append({"date": date_text})
+        self.loaded_common_revisions["calendar"] = hashlib.sha256(raw).hexdigest()
         return dates
 
     def get_common_master_revisions(self) -> dict[str, str]:
@@ -242,9 +260,8 @@ class DailyReportRepository:
 
     def get_loaded_common_revisions(self) -> dict[str, str]:
         """表示した内容の版を返し、読み込み失敗した管理データの保存を防ぐ。"""
-        return {**{master: self.loaded_common_revisions.get(master, "")
-                   for master in ORGANIZATION_MASTERS},
-                "calendar": self.get_common_master_revision("calendar")}
+        return {master: self.loaded_common_revisions.get(master, "")
+                for master in COMMON_MASTER_COLUMNS}
 
     def get_common_master_revision(self, master: str) -> str:
         if master not in COMMON_MASTER_COLUMNS:
@@ -283,20 +300,19 @@ class DailyReportRepository:
             raise CommonMasterConflictError(
                 "管理が別の場所で更新されています。"
             )
-        self._write_csv_atomically(df, target_path, "common")
-        return self._common_master_revision(target_path)
+        return self._write_csv_atomically(df, target_path, "common")
 
     def save_user_administration(
         self,
         users: list[dict[str, str]],
         expected_revisions: dict[str, str],
+        *,
+        actor_employee_id: str | None = None,
     ) -> dict[str, str]:
         with self._administration_lock():
-            common = self.load_common_masters()
-            if self.load_warnings:
-                raise ValueError("管理データを正常に読み込めないため保存できません。")
             return self._save_administration_locked(
-                common["team_master"], users, common["comment_assignment"], expected_revisions
+                None, users, None, expected_revisions,
+                actor_employee_id=actor_employee_id,
             )
 
     def save_administration(
@@ -305,9 +321,14 @@ class DailyReportRepository:
         users: list[dict[str, str]],
         comment_assignments: list[dict[str, str]],
         expected_revisions: dict[str, str],
+        *,
+        actor_employee_id: str | None = None,
     ) -> dict[str, str]:
         with self._administration_lock():
-            return self._save_administration_locked(teams, users, comment_assignments, expected_revisions)
+            return self._save_administration_locked(
+                teams, users, comment_assignments, expected_revisions,
+                actor_employee_id=actor_employee_id,
+            )
 
     @contextmanager
     def _administration_lock(self):
@@ -342,17 +363,42 @@ class DailyReportRepository:
 
     def _save_administration_locked(
         self,
-        teams: list[dict[str, str]],
+        teams: list[dict[str, str]] | None,
         users: list[dict[str, str]],
-        assignments: list[dict[str, str]],
+        assignments: list[dict[str, str]] | None,
         expected_revisions: dict[str, str],
+        *,
+        actor_employee_id: str | None = None,
     ) -> dict[str, str]:
         """ロック中に版を検証し、関連する管理データを一度の置換で保存する。"""
         from app.security import validate_administration_save_request
-        current = self.get_common_master_revisions()
+        # 権限・本人削除・競合の確認は、ロック取得後に読んだ同じ内容で行う。
+        # 組織情報の保存にはカレンダーを使用しない。
+        warning_count = len(self.load_warnings)
+        current_users, current_teams, current_assignments, _ = self._load_organization_masters(
+            self.storage_dir("common")
+        )
+        if len(self.load_warnings) != warning_count:
+            raise ValueError("管理データを正常に読み込めないため保存できません。")
+        if actor_employee_id is not None:
+            actor_id = str(actor_employee_id).strip()
+            actor = next((row for row in current_users
+                          if str(row.get("employee_id", "")).strip() == actor_id), {})
+            if not actor_id or not (
+                str(actor.get("employment_type", "")).strip() == "regular"
+                and str(actor.get("is_admin", "")).strip() == "1"
+            ):
+                raise AdministrationAccessDeniedError("管理者権限がありません。")
+            if not any(str(row.get("employee_id", "")).strip() == actor_id for row in users):
+                raise RequestValidationError("ログイン中の管理者は削除できません。")
+        current = self.loaded_common_revisions
         for master in ORGANIZATION_MASTERS:
             if not expected_revisions.get(master) or expected_revisions[master] != current[master]:
                 raise CommonMasterConflictError("管理が別の場所で更新されています。再読み込みしてください。")
+        if teams is None:
+            teams = current_teams
+        if assignments is None:
+            assignments = current_assignments
         teams, users, assignments, _ = validate_administration_save_request({
             "teams": teams, "users": users, "comment_assignments": assignments,
             "revisions": {master: expected_revisions[master] for master in ORGANIZATION_MASTERS},
@@ -364,8 +410,7 @@ class DailyReportRepository:
                              for column in ADMINISTRATION_COLUMNS})
         frame = Table(rows, columns=ADMINISTRATION_COLUMNS) if rows else self._empty_df(ADMINISTRATION_COLUMNS)
         target = self.storage_dir("common") / "administration.csv"
-        self._write_csv_atomically(frame, target, "common")
-        revision = self._common_master_revision(target)
+        revision = self._write_csv_atomically(frame, target, "common")
         return dict.fromkeys(ORGANIZATION_MASTERS, revision)
 
     def _common_master_frame(
@@ -433,40 +478,6 @@ class DailyReportRepository:
         except Exception:
             # ログ出力失敗によって、読み込めたデータの表示まで止めない。
             pass
-
-    def load_view_data(
-        self,
-        employee_id: str,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        period_preset: str | None = None,
-    ) -> dict[str, Any]:
-        common = self.load_common()
-        global_order = self._global_user_order(common)
-        assignments = self._resolved_comment_assignments(
-            common, global_order=global_order
-        )
-        scope = self.resolve_view_scope(
-            common,
-            employee_id,
-            global_order=global_order,
-            assignments=assignments,
-        )
-        target_employee_ids = scope["target_employee_ids"]
-        users_df = self._load_all_user_rows(target_employee_ids, common)
-        comments_df = self._load_all_comment_rows(target_employee_ids)
-        return self.build_view_data_from_cache(
-            employee_id,
-            common,
-            users_df,
-            comments_df,
-            start_date=start_date,
-            end_date=end_date,
-            period_preset=period_preset,
-            load_warning_count=len(self.load_warnings),
-            global_order=global_order,
-            assignments=assignments,
-        )
 
     def resolve_view_scope(
         self,
@@ -1190,9 +1201,9 @@ class DailyReportRepository:
             status = result[side] = {'needed':bool(reports or grouped[side]), 'saved':False, 'error':''}
             if not status['needed']: continue
             try:
-                path, output, revision, fingerprint = conversation.save_partition(
+                path, output, revision, fingerprint, peers = conversation.save_partition(
                     self, employee_id, side, reports, grouped[side], common, report_revision)
-                status.update(saved=True, revision=revision, _cache_path=str(path), _cache_frame=output, _cache_fingerprint=fingerprint)
+                status.update(saved=True, revision=revision, _cache_path=str(path), _cache_frame=output, _cache_fingerprint=fingerprint, _cache_peers=peers)
             except CsvFileLockedError as exc:
                 status.update(error=str(exc),error_code='csv_locked')
             except CsvReadonlyError as exc:
@@ -1313,18 +1324,40 @@ class DailyReportRepository:
     def load_comment_partition(
         self, path: Path, allowed_employee_ids: set[str] | None
     ) -> Table:
-        if not path.exists():
+        key = self._report_path_key(path)
+        try:
+            with path.open("rb") as stream:
+                raw = stream.read()
+                loaded = os.fstat(stream.fileno())
+        except FileNotFoundError:
+            self.loaded_comment_fingerprints.pop(key, None)
             return self._empty_df(COMMENT_COLUMNS)
-        frame = self._read_csv_frame(path)
+        frame = self._read_csv_bytes(raw)
         try:
             conversation.validate_frame(frame, path.stem, 'comment')
         except ValueError as exc:
             raise ReportFormatError(str(exc)) from exc
+        self.loaded_comment_fingerprints[key] = (loaded.st_size, loaded.st_mtime_ns)
         if allowed_employee_ids is not None:
             frame = frame.where_in("subordinate_employee_id", allowed_employee_ids)
         if self.defer_partition_normalization:
             return frame
         return frame
+
+    def load_verified_peer_partition(
+        self, path: Path, employee_id: str, kind: str
+    ) -> VerifiedPartition:
+        key = self._report_path_key(path)
+        if kind == "comment":
+            frame = self.load_comment_partition(path, None)
+            return VerifiedPartition(path, kind, employee_id, frame,
+                                     self.loaded_comment_fingerprints.get(key))
+        if kind == "report":
+            frame = self.load_report_partition(path, employee_id)
+            return VerifiedPartition(path, kind, employee_id, frame,
+                                     self.loaded_report_fingerprints.get(key),
+                                     self.loaded_report_revisions[key])
+        raise ValueError("保存検証のファイル種別が不正です。")
 
     def combine_report_partitions(
         self, partitions: list[Table]
@@ -1352,99 +1385,6 @@ class DailyReportRepository:
 
     def load_calendar_master(self) -> list[dict[str, Any]]:
         return self._load_calendar(self.storage_dir("common"))
-
-    def _load_all_user_rows(
-        self,
-        allowed_employee_ids: list[str],
-        common: dict[str, list[dict[str, Any]]] | None = None,
-    ) -> Table:
-        partitions: list[Table] = []
-        common = common or self.load_common()
-        user_master = {
-            str(row.get("employee_id", "")).strip(): row
-            for row in common.get("user_master", [])
-        }
-        files: list[tuple[str, Path]] = []
-        for employee_id in dict.fromkeys(allowed_employee_ids):
-            if not employee_id:
-                continue
-            user = user_master.get(str(employee_id), {})
-            employment_type = str(user.get("employment_type", "regular")).strip()
-            kind = (
-                "temporary_reports"
-                if employment_type == "temporary"
-                else "regular_reports"
-            )
-            directory = self.storage_dir(kind)
-            # Do not auto-create report folders.  A missing folder is a failed
-            # target and is handled by the cache/API as a partial load.
-            if not directory.exists():
-                self._record_load_warning(
-                    directory,
-                    FileNotFoundError(f"{kind} directory is missing"),
-                )
-                continue
-            if not directory.is_dir():
-                self._record_load_warning(
-                    directory,
-                    NotADirectoryError(f"{kind} path is not a directory"),
-                )
-                continue
-            if not os.access(directory, os.R_OK):
-                self._record_load_warning(
-                    directory,
-                    PermissionError(f"{kind} directory is not readable"),
-                )
-                continue
-            try:
-                file = safe_employee_csv_path(directory, str(employee_id))
-            except ValueError as exc:
-                self._record_load_warning(Path(directory) / str(employee_id), exc)
-                continue
-            files.append((str(employee_id), file))
-        for employee_id, file in files:
-            if not file.exists():
-                continue
-            try:
-                partitions.append(self.load_report_partition(file, employee_id))
-            except Exception as exc:
-                self._record_load_warning(file, exc)
-
-        return self.combine_report_partitions(partitions)
-
-    def _load_all_comment_rows(
-        self, allowed_employee_ids: list[str] | None = None
-    ) -> Table:
-        partitions: list[Table] = []
-        comments_dir = self.storage_dir("comments")
-        if not comments_dir.exists():
-            self._record_load_warning(
-                comments_dir,
-                FileNotFoundError("comments directory is missing"),
-            )
-            files: list[Path] = []
-        elif not comments_dir.is_dir():
-            self._record_load_warning(
-                comments_dir,
-                NotADirectoryError("comments path is not a directory"),
-            )
-            files = []
-        elif not os.access(comments_dir, os.R_OK):
-            self._record_load_warning(
-                comments_dir,
-                PermissionError("comments directory is not readable"),
-            )
-            files = []
-        else:
-            files = list(comments_dir.glob("*.csv"))
-        allowed_ids = set(allowed_employee_ids or [])
-        for file in files:
-            try:
-                partitions.append(self.load_comment_partition(file, allowed_ids if allowed_employee_ids is not None else None))
-            except Exception as exc:
-                self._record_load_warning(file, exc)
-
-        return self.combine_comment_partitions(partitions)
 
     def _build_rows(
         self,
@@ -1637,8 +1577,64 @@ class DailyReportRepository:
     def _write_csv_atomically(
         self, df: Table, target_path: Path, backup_group: str
     ) -> str:
-        """Write a CSV completely, then replace the destination in one operation."""
-        return self._write_csv_frames_atomically([(df, target_path)], backup_group)[target_path]
+        """Back up the old CSV locally and replace it with a complete staged file."""
+        stage_path: Path | None = None
+        write_error: Exception | None = None
+        readonly_error: Exception | None = None
+        try:
+            if not target_path.parent.is_dir():
+                raise FileNotFoundError(
+                    f"CSV保存先フォルダが見つかりません: {target_path.parent}"
+                )
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                prefix=f".{target_path.stem}.",
+                suffix=".tmp",
+                dir=target_path.parent,
+                delete=False,
+            ) as temporary:
+                stage_path = Path(temporary.name)
+                # 保存するバイト列から版を計算し、保存後の再読込を避ける。
+                payload = df.write_csv(include_bom=True).encode("utf-8")
+                temporary.write(payload)
+                temporary.flush()
+                os.fsync(temporary.fileno())
+                revision = hashlib.sha256(payload).hexdigest()
+
+            if target_path.exists():
+                try:
+                    self._set_csv_readonly(target_path, False)
+                except Exception as exc:
+                    raise self._classify_csv_write_error(exc, target_path, "unlock") from exc
+                # 保存前の内容はローカルだけに残す。共有先に.rollbackは作らない。
+                self._backup_csv(target_path, backup_group)
+            try:
+                os.replace(stage_path, target_path)
+            except Exception as exc:
+                raise self._classify_csv_write_error(exc, target_path, "replace") from exc
+            stage_path = None
+        except Exception as exc:
+            write_error = exc
+            raise
+        finally:
+            try:
+                if target_path.is_file():
+                    self._set_csv_readonly(target_path, True)
+            except Exception as exc:
+                logger.error(
+                    "Failed to restore CSV read-only attribute: %s",
+                    target_path, exc_info=True,
+                )
+                if write_error is None:
+                    readonly_error = exc
+            if stage_path is not None:
+                try:
+                    stage_path.unlink(missing_ok=True)
+                except Exception:
+                    logger.warning("Failed to remove temporary CSV: %s", stage_path, exc_info=True)
+            if readonly_error is not None:
+                raise CsvReadonlyError("CSVを読み取り専用に設定できませんでした。") from readonly_error
+        return revision
 
     @staticmethod
     def _set_csv_readonly(path: Path, readonly: bool) -> None:
@@ -1666,127 +1662,6 @@ class DailyReportRepository:
                 "CSVが使用中です。Excelなどで開いている場合は閉じてから、もう一度保存してください。"
             )
         return exc
-
-    def _write_csv_frames_atomically(
-        self,
-        frames: list[tuple[Table, Path]],
-        backup_group: str,
-    ) -> dict[Path, str]:
-        revisions: dict[Path, str] = {}
-        staged: dict[Path, Path | None] = {}
-        originals: dict[Path, Path | None] = {}
-        replaced: list[Path] = []
-        target_paths = list(dict.fromkeys(target_path for _, target_path in frames))
-        write_error: Exception | None = None
-        readonly_error: Exception | None = None
-        try:
-            for df, target_path in frames:
-                # Fixed storage subfolders are deployment-managed.  Never
-                # create them implicitly during a save.
-                if not target_path.parent.is_dir():
-                    raise FileNotFoundError(
-                        f"CSV保存先フォルダが見つかりません: {target_path.parent}"
-                    )
-                with tempfile.NamedTemporaryFile(
-                    mode="wb",
-                    prefix=f".{target_path.stem}.",
-                    suffix=".tmp",
-                    dir=target_path.parent,
-                    delete=False,
-                ) as temporary:
-                    staged[target_path] = Path(temporary.name)
-                    # 同じバイト列を保存と版の計算に使い、ハッシュ用の再読み込みをしない。
-                    payload = df.write_csv(include_bom=True).encode("utf-8")
-                    temporary.write(payload)
-                    temporary.flush()
-                    os.fsync(temporary.fileno())
-                    revisions[target_path] = hashlib.sha256(payload).hexdigest()
-                stage_path = staged[target_path]
-                if stage_path is None:
-                    raise RuntimeError("一時CSVを作成できませんでした。")
-
-            for _, target_path in frames:
-                originals[target_path] = None
-                if target_path.exists():
-                    try:
-                        self._set_csv_readonly(target_path, False)
-                    except Exception as exc:
-                        raise self._classify_csv_write_error(
-                            exc, target_path, "unlock"
-                        ) from exc
-                    with tempfile.NamedTemporaryFile(
-                        mode="wb",
-                        prefix=f".{target_path.stem}.",
-                        suffix=".rollback",
-                        dir=target_path.parent,
-                        delete=False,
-                    ) as original:
-                        originals[target_path] = Path(original.name)
-                    original_path = originals[target_path]
-                    if original_path is not None:
-                        shutil.copy2(target_path, original_path)
-                    self._backup_csv(target_path, backup_group)
-
-            for _, target_path in frames:
-                stage_path = staged[target_path]
-                if stage_path is None:
-                    raise RuntimeError("保存対象の一時CSVがありません。")
-                try:
-                    os.replace(stage_path, target_path)
-                except Exception as exc:
-                    raise self._classify_csv_write_error(
-                        exc, target_path, "replace"
-                    ) from exc
-                staged[target_path] = None
-                replaced.append(target_path)
-        except Exception as exc:
-            write_error = exc
-            for target_path in reversed(replaced):
-                original_path = originals.get(target_path)
-                try:
-                    if original_path is None:
-                        target_path.unlink(missing_ok=True)
-                    else:
-                        os.replace(original_path, target_path)
-                        originals[target_path] = None
-                except Exception:
-                    logger.critical(
-                        "Failed to roll back a CSV transaction: %s",
-                        target_path,
-                        exc_info=True,
-                    )
-            raise
-        finally:
-            # Read-only is a safety net, not an ACL.  Apply it after both a
-            # successful replacement and a rollback, and never hide the
-            # original write/lock failure.
-            for target_path in target_paths:
-                try:
-                    if target_path.is_file():
-                        self._set_csv_readonly(target_path, True)
-                except Exception as exc:
-                    logger.error(
-                        "Failed to restore CSV read-only attribute: %s",
-                        target_path,
-                        exc_info=True,
-                    )
-                    if write_error is None and readonly_error is None:
-                        readonly_error = exc
-            for path in (*staged.values(), *originals.values()):
-                if path is not None:
-                    try:
-                        path.unlink(missing_ok=True)
-                    except Exception:
-                        logger.warning(
-                            "Failed to remove CSV transaction temporary file: %s",
-                            path,
-                            exc_info=True,
-                        )
-            if write_error is None and readonly_error is not None:
-                raise CsvReadonlyError(
-                    "CSVを読み取り専用に設定できませんでした。"
-                ) from readonly_error
-        return revisions
 
     def _backup_csv(self, target_path: Path, backup_group: str) -> None:
         backup_dir = self.base_dir / "cache" / "csv_backups" / backup_group

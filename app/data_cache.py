@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import stat
 from copy import deepcopy
 from collections import OrderedDict
 from dataclasses import dataclass, replace
@@ -14,7 +15,7 @@ from typing import Any
 from app.sqlite_table import Table
 
 from app.config import AppSettings
-from app.repository import DailyReportRepository, USER_COLUMNS, USER_KEYS, COMMENT_COLUMNS, COMMENT_KEYS
+from app.repository import DailyReportRepository, VerifiedPartition, USER_COLUMNS, USER_KEYS, COMMENT_COLUMNS, COMMENT_KEYS
 from app.security import safe_employee_csv_path
 
 
@@ -85,6 +86,7 @@ class DailyReportDataCache:
         self._review_summary: tuple[tuple[Any, ...], dict[str, Any]] | None = None
         self._views: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
         self._startup_common = None
+        self._management_reload_pending = False
 
     def read_startup_common(self, settings: AppSettings, employee_id: str):
         """初期画面のマスターを、変更検知付きで初回日報読み込みへ引き継ぐ。"""
@@ -92,9 +94,9 @@ class DailyReportDataCache:
             repository = DailyReportRepository(settings, self._base_dir)
             repository.validate_paths()
             paths = self._common_paths(settings)
-            before = {key: self._fingerprint(path) for key, path in paths.items()}
+            before = self._common_fingerprints(paths)
             common = repository.load_common()
-            after = {key: self._fingerprint(path) for key, path in paths.items()}
+            after = self._common_fingerprints(paths)
             if before == after and not repository.load_warnings:
                 self._startup_common = (self._settings_paths(settings), employee_id, after, common, dict(repository.loaded_common_revisions))
             else:
@@ -119,6 +121,15 @@ class DailyReportDataCache:
             self._review_summary = None
             self._views.clear()
             self._invalid_paths.clear()
+
+    def defer_management_reload(self, revisions: dict[str, str] | None = None) -> None:
+        """Record management changes without touching report/comment files."""
+        with self._lock:
+            if revisions is None or (
+                self._snapshot is not None
+                and dict(self._snapshot.common_revisions) != revisions
+            ):
+                self._management_reload_pending = True
 
     def invalidate_partition(self, path: Path | str, reason: str) -> None:
         key = self._path_key(path)
@@ -220,13 +231,22 @@ class DailyReportDataCache:
         end_date: str | None = None,
         period_preset: str | None = None,
         force_refresh: bool = False,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
+    ) -> tuple[dict[str, Any], dict[str, Any], CacheSnapshot]:
         operation_started = perf_counter()
-        access = (
-            self.refresh_changed(settings, employee_id)
-            if force_refresh
-            else self.ensure_loaded(settings, employee_id)
-        )
+        with self._lock:
+            if self._management_reload_pending:
+                self.invalidate_all("management changed; rebuild on report entry")
+                self._startup_common = None
+                access = self.ensure_loaded(settings, employee_id)
+                # Keep the request pending after a partial read, so retry is possible.
+                if not access.snapshot.warnings:
+                    self._management_reload_pending = False
+            else:
+                access = (
+                    self.refresh_changed(settings, employee_id)
+                    if force_refresh
+                    else self.ensure_loaded(settings, employee_id)
+                )
         snapshot = access.snapshot
         repository = DailyReportRepository(settings, self._base_dir)
         view_started = perf_counter()
@@ -316,7 +336,7 @@ class DailyReportDataCache:
             ],
             **data_load_diagnostics,
         }
-        return data, diagnostics
+        return data, diagnostics, snapshot
 
     def _combined_frames(
         self, snapshot: CacheSnapshot, repository: DailyReportRepository
@@ -545,6 +565,56 @@ class DailyReportDataCache:
                 )
             return changed
 
+    def apply_verified_partitions(
+        self, settings: AppSettings, employee_id: str,
+        partitions: list[VerifiedPartition],
+    ) -> bool:
+        """再読込せず検証済み内容を反映する。以後の変更検出には読取時の更新情報を使う。"""
+        with self._lock:
+            snapshot = self._snapshot
+            if (snapshot is None or snapshot.employee_id != employee_id
+                    or snapshot.settings_paths != self._settings_paths(settings)):
+                return False
+            targets = set(snapshot.target_employee_ids)
+            allowed = {
+                "report": self._report_paths(settings, snapshot.target_employee_ids, snapshot.common),
+                "comment": self._comment_paths(settings, snapshot.target_employee_ids, snapshot.common),
+            }
+            reports = dict(snapshot.report_partitions)
+            comments = dict(snapshot.comment_partitions)
+            revisions = dict(snapshot.report_revisions)
+            manifest = dict(snapshot.file_manifest)
+            warnings = snapshot.warnings
+            report_failures = list(snapshot.report_load_failures)
+            comment_failures = list(snapshot.comment_load_failures)
+            for partition in partitions:
+                path = allowed.get(partition.kind, {}).get(partition.employee_id)
+                key = self._path_key(partition.path)
+                if path is None or self._path_key(path) != key:
+                    continue
+                if partition.kind == "report":
+                    reports[key] = partition.frame.clone()
+                    revisions[key] = partition.revision
+                    report_failures = [item for item in report_failures
+                                       if item.get("employee_id") != partition.employee_id]
+                else:
+                    comments[key] = self._filter_comment_frame(partition.frame, targets)
+                    comment_failures = [item for item in comment_failures
+                                        if item.get("superior_employee_id") != partition.employee_id]
+                if partition.fingerprint is None:
+                    manifest.pop(key, None)
+                else:
+                    manifest[key] = FileFingerprint(*partition.fingerprint)
+                warnings = self._remove_warning(warnings, key)
+                self._invalid_paths.discard(key)
+            self._snapshot = self._replace_snapshot(
+                snapshot, report_partitions=reports, comment_partitions=comments,
+                report_revisions=revisions, file_manifest=manifest, warnings=warnings,
+                report_load_failures=tuple(report_failures),
+                comment_load_failures=tuple(comment_failures),
+            )
+            return True
+
     def _build_snapshot(
         self, settings: AppSettings, employee_id: str
     ) -> CacheSnapshot:
@@ -555,7 +625,8 @@ class DailyReportDataCache:
         csv_read_started = perf_counter()
         # 起動時に読んだマスターは、保存先・利用者・ファイルが同じ場合だけ再利用する。
         seed, self._startup_common = self._startup_common, None
-        fingerprints = {key: self._fingerprint(path) for key, path in self._common_paths(settings).items()}
+        common_paths = self._common_paths(settings)
+        fingerprints = self._common_fingerprints(common_paths)
         reused_common = seed is not None and seed[:3] == (self._settings_paths(settings), employee_id, fingerprints)
         if reused_common:
             common = seed[3]
@@ -575,11 +646,11 @@ class DailyReportDataCache:
         warning_names = {str(item.get("file", "")) for item in warnings}
         csv_read_count = sum(
             1
-            for path in set(self._common_paths(settings).values())
+            for path in set(common_paths.values())
             if not reused_common and path.exists() and path.name not in warning_names
         )
 
-        for path in set(self._common_paths(settings).values()):
+        for path in set(common_paths.values()):
             if path.name in warning_names:
                 continue
             fingerprint = self._fingerprint(path)
@@ -587,6 +658,7 @@ class DailyReportDataCache:
                 manifest[self._path_key(path)] = fingerprint
 
         report_paths = self._report_paths(settings, target_ids, common)
+        directory_checks: dict[Path, Exception | None] = {}
         user_master = {
             str(row.get("employee_id", "")).strip(): row
             for row in common.get("user_master", [])
@@ -595,18 +667,9 @@ class DailyReportDataCache:
             path: Path | None = None
             try:
                 path = report_paths[target_id]
-                if not path.parent.exists():
-                    raise FileNotFoundError(
-                        f"日報フォルダが見つかりません: {path.parent.name}"
-                    )
-                if not path.parent.is_dir():
-                    raise NotADirectoryError(
-                        f"日報パスがフォルダではありません: {path.parent.name}"
-                    )
-                if not os.access(path.parent, os.R_OK):
-                    raise PermissionError(
-                        f"日報フォルダにアクセスできません: {path.parent.name}"
-                    )
+                directory_error = self._directory_error(path.parent, "日報", directory_checks)
+                if directory_error is not None:
+                    raise directory_error
                 if not path.exists():
                     continue
                 frame = repository.load_report_partition(path, target_id)
@@ -626,8 +689,7 @@ class DailyReportDataCache:
                 )
                 directory_failure = (
                     path is None
-                    or not path.parent.is_dir()
-                    or not os.access(path.parent, os.R_OK)
+                    or directory_checks.get(path.parent) is not None
                 )
                 report_load_failures.append(
                     self._report_failure(
@@ -638,30 +700,11 @@ class DailyReportDataCache:
                     )
                 )
 
-        if target_set:
+        required_comments = self._comment_paths(settings, target_ids, common)
+        if required_comments:
             comments_dir = settings.storage_dir("comments")
-            comments_error: Exception | None = None
-            if not comments_dir.exists():
-                comments_error = FileNotFoundError(
-                    f"上司コメントフォルダが見つかりません: {comments_dir.name}"
-                )
-            elif not comments_dir.is_dir():
-                comments_error = NotADirectoryError(
-                    f"上司コメントパスがフォルダではありません: {comments_dir.name}"
-                )
-            elif not os.access(comments_dir, os.R_OK):
-                comments_error = PermissionError(
-                    f"上司コメントフォルダにアクセスできません: {comments_dir.name}"
-                )
-            try:
-                comment_files = (
-                    self._csv_files(comments_dir)
-                    if comments_error is None
-                    else []
-                )
-            except Exception as exc:
-                comments_error = exc
-                comment_files = []
+            comments_error = self._directory_error(comments_dir, "上司コメント", directory_checks)
+            comment_files = list(required_comments.values()) if comments_error is None else []
             if comments_error is not None:
                 exc = comments_error
                 warnings.append(self._warning(comments_dir, exc))
@@ -685,12 +728,14 @@ class DailyReportDataCache:
                 comment_files = []
             for path in comment_files:
                 try:
+                    if not path.exists():
+                        continue
                     frame = repository.load_comment_partition(path, target_set)
                     key = self._path_key(path)
                     comment_partitions[key] = frame
-                    fingerprint = self._fingerprint(path)
+                    fingerprint = repository.loaded_comment_fingerprints.get(key)
                     if fingerprint is not None:
-                        manifest[key] = fingerprint
+                        manifest[key] = FileFingerprint(*fingerprint)
                     csv_read_count += 1
                 except Exception as exc:
                     warnings.append(self._warning(path, exc))
@@ -754,9 +799,12 @@ class DailyReportDataCache:
             return CacheAccess(built, "built")
 
         scan_started = perf_counter()
+        directory_checks: dict[Path, Exception | None] = {}
         try:
+            common_paths = self._common_paths(settings)
             current_manifest = self._scan_manifest(
-                settings, snapshot.target_employee_ids, snapshot.common
+                settings, snapshot.target_employee_ids, snapshot.common,
+                directory_checks, common_paths,
             )
         except Exception as exc:
             logger.exception("Failed to scan daily-report cache manifest")
@@ -778,7 +826,7 @@ class DailyReportDataCache:
         common = snapshot.common
         common_revisions = dict(snapshot.common_revisions)
         target_ids = tuple(snapshot.target_employee_ids)
-        warnings = snapshot.warnings
+        warnings = self._remove_warning(snapshot.warnings, "manifest")
         report_load_failures = [dict(item) for item in snapshot.report_load_failures]
         comment_load_failures = [dict(item) for item in snapshot.comment_load_failures]
         changed_count = 0
@@ -789,7 +837,6 @@ class DailyReportDataCache:
         csv_read_duration_ms = 0.0
         changed_state = False
 
-        common_paths = self._common_paths(settings)
         common_keys = {self._path_key(path) for path in common_paths.values()}
         old_common_manifest = {
             key: value for key, value in manifest.items() if key in common_keys
@@ -839,25 +886,15 @@ class DailyReportDataCache:
                         candidate_scope["target_employee_ids"]
                     )
                     common = candidate_common
-                    if candidate_targets != target_ids:
-                        reports, comments, manifest, scope_warnings, reads = (
-                            self._reconcile_scope(
-                                settings,
-                                repository,
-                                reports,
-                                comments,
-                                manifest,
-                                target_ids,
-                                candidate_targets,
-                                common=candidate_common,
-                            )
-                        )
-                        warnings = self._merge_warnings(warnings, scope_warnings)
-                        failed_count += len(scope_warnings)
-                        csv_read_count += reads
-                        target_ids = candidate_targets
-                        report_revisions = {key: value for key, value in report_revisions.items() if key in reports}
-                        report_revisions.update(repository.loaded_report_revisions)
+                    if set(candidate_targets) != set(target_ids):
+                        # CSV自体が未変更でも、抽出対象の部下が変われば再読込する。
+                        # 失敗時に保持する前回値からも閲覧対象外の行を除く。
+                        self._invalid_paths.update(comments)
+                        comments = {
+                            key: self._filter_comment_frame(frame, set(candidate_targets))
+                            for key, frame in comments.items()
+                        }
+                    target_ids = candidate_targets
                     changed_state = True
                 else:
                     calendar = repository.load_calendar_master()
@@ -922,36 +959,21 @@ class DailyReportDataCache:
         report_paths = self._report_paths(settings, target_ids, common)
         report_directory_errors: dict[str, Exception] = {}
         for target_id, path in report_paths.items():
-            if not path.parent.exists():
-                report_directory_errors[target_id] = FileNotFoundError(
-                    f"日報フォルダが見つかりません: {path.parent.name}"
-                )
-            elif not path.parent.is_dir():
-                report_directory_errors[target_id] = NotADirectoryError(
-                    f"日報パスがフォルダではありません: {path.parent.name}"
-                )
-            elif not os.access(path.parent, os.R_OK):
-                report_directory_errors[target_id] = PermissionError(
-                    f"日報フォルダにアクセスできません: {path.parent.name}"
-                )
+            error = self._directory_error(path.parent, "日報", directory_checks)
+            if error is not None:
+                report_directory_errors[target_id] = error
 
         comments_dir = settings.storage_dir("comments")
-        comment_directory_error: Exception | None = None
-        if not comments_dir.exists():
-            comment_directory_error = FileNotFoundError(
-                f"上司コメントフォルダが見つかりません: {comments_dir.name}"
-            )
-        elif not comments_dir.is_dir():
-            comment_directory_error = NotADirectoryError(
-                f"上司コメントパスがフォルダではありません: {comments_dir.name}"
-            )
-        elif not os.access(comments_dir, os.R_OK):
-            comment_directory_error = PermissionError(
-                f"上司コメントフォルダにアクセスできません: {comments_dir.name}"
-            )
+        required_comments = self._comment_paths(settings, target_ids, common)
+        comment_directory_error = (
+            self._directory_error(comments_dir, "上司コメント", directory_checks)
+            if required_comments else None
+        )
 
         if target_ids != snapshot.target_employee_ids or common is not snapshot.common:
-            current_manifest = self._scan_manifest(settings, target_ids, common)
+            current_manifest = self._scan_manifest(
+                settings, target_ids, common, directory_checks, common_paths
+            )
         manifest_scan_duration_ms += (perf_counter() - next_scan_started) * 1000
         report_path_by_key = {
             self._path_key(path): (target_id, path)
@@ -959,8 +981,41 @@ class DailyReportDataCache:
         }
         comment_paths = {
             self._path_key(path): path
-            for path in self._csv_files(comments_dir)
+            for path in required_comments.values()
         }
+
+        # 担当変更だけで閲覧対象の部下が同じ場合も、不要になった上司を除外する。
+        previous_comment_paths = self._comment_paths(
+            settings, snapshot.target_employee_ids, snapshot.common
+        )
+        previous_report_paths = self._report_paths(
+            settings, snapshot.target_employee_ids, snapshot.common
+        )
+        for directory in {path.parent for path in previous_report_paths.values()} - {
+            path.parent for path in report_paths.values()
+        }:
+            warnings = self._remove_warning(warnings, str(directory))
+        obsolete_keys = (
+            set(reports) | set(comments)
+            | {self._path_key(path) for path in previous_comment_paths.values()}
+            | {self._path_key(path) for path in previous_report_paths.values()}
+        ) - set(report_path_by_key) - set(comment_paths)
+        for key in obsolete_keys:
+            reports.pop(key, None)
+            report_revisions.pop(key, None)
+            comments.pop(key, None)
+            manifest.pop(key, None)
+            self._invalid_paths.discard(key)
+            warnings = self._remove_warning(warnings, key)
+            changed_state = True
+        report_load_failures = [
+            item for item in report_load_failures
+            if item.get("employee_id") in report_paths
+        ]
+        comment_load_failures = [
+            item for item in comment_load_failures
+            if item.get("superior_employee_id") in required_comments
+        ]
 
         user_master = {
             str(row.get("employee_id", "")).strip(): row
@@ -986,6 +1041,8 @@ class DailyReportDataCache:
                 str(error),
             )
         valid_report_ids = set(report_paths) - set(report_directory_errors)
+        for target_id in valid_report_ids:
+            warnings = self._remove_warning(warnings, str(report_paths[target_id].parent))
         report_load_failures = [
             item
             for item in report_load_failures
@@ -1016,20 +1073,43 @@ class DailyReportDataCache:
                 str(comment_directory_error),
             )
         else:
+            warnings = self._remove_warning(warnings, str(comments_dir))
             comment_load_failures = [
                 item
                 for item in comment_load_failures
                 if item.get("source") != "directory"
             ]
 
+        failed_count += len(report_directory_errors)
+        if comment_directory_error is not None:
+            failed_count += len(required_comments)
+        failed_report_ids = {
+            item.get("employee_id")
+            for item in (*snapshot.report_load_failures, *report_load_failures)
+        }
+        failed_superior_ids = {
+            item.get("superior_employee_id")
+            for item in (*snapshot.comment_load_failures, *comment_load_failures)
+        }
         data_keys = set(report_path_by_key) | set(comment_paths) | set(reports) | set(comments)
         for key in sorted(data_keys):
             if key in common_keys:
                 continue
+            report_target = report_path_by_key.get(key, ("", None))[0]
+            if report_target in report_directory_errors or (
+                key in comment_paths and comment_directory_error is not None
+            ):
+                # 一時的なアクセス障害をファイル削除と見なさず、次回に再試行する。
+                self._invalid_paths.add(key)
+                continue
             old_fingerprint = manifest.get(key)
             new_fingerprint = current_manifest.get(key)
             invalid = key in self._invalid_paths
-            if old_fingerprint == new_fingerprint and not invalid:
+            has_failure = (
+                report_target in failed_report_ids if report_target
+                else comment_paths[key].stem in failed_superior_ids
+            )
+            if old_fingerprint == new_fingerprint and not invalid and not has_failure:
                 continue
 
             existed = old_fingerprint is not None
@@ -1091,7 +1171,9 @@ class DailyReportDataCache:
                     continue
                 manifest[key] = (
                     FileFingerprint(*repository.loaded_report_fingerprints[key])
-                    if key in repository.loaded_report_fingerprints else new_fingerprint
+                    if key in repository.loaded_report_fingerprints else
+                    FileFingerprint(*repository.loaded_comment_fingerprints[key])
+                    if key in repository.loaded_comment_fingerprints else new_fingerprint
                 )
                 self._invalid_paths.discard(key)
                 warnings = self._remove_warning(warnings, key)
@@ -1158,7 +1240,11 @@ class DailyReportDataCache:
             deleted=deleted_count,
             failed=failed_count,
         )
-        if changed_state or failed_count:
+        if (
+            changed_state or failed_count or warnings != snapshot.warnings
+            or tuple(report_load_failures) != snapshot.report_load_failures
+            or tuple(comment_load_failures) != snapshot.comment_load_failures
+        ):
             refreshed = self._replace_snapshot(
                 snapshot,
                 common=common,
@@ -1192,101 +1278,25 @@ class DailyReportDataCache:
         )
         return CacheAccess(refreshed, status, result)
 
-    def _reconcile_scope(
-        self,
-        settings: AppSettings,
-        repository: DailyReportRepository,
-        reports: dict[str, Table],
-        comments: dict[str, Table],
-        manifest: dict[str, FileFingerprint],
-        old_target_ids: tuple[str, ...],
-        new_target_ids: tuple[str, ...],
-        common: dict[str, list[dict[str, Any]]] | None = None,
-    ) -> tuple[
-        dict[str, Table],
-        dict[str, Table],
-        dict[str, FileFingerprint],
-        tuple[dict[str, str], ...],
-        int,
-    ]:
-        new_reports: dict[str, Table] = {}
-        new_comments: dict[str, Table] = {}
-        new_manifest = dict(manifest)
-        warnings: list[dict[str, str]] = []
-        reads = 0
-        common = common or repository.load_common()
-        old_report_keys = {
-            self._path_key(path)
-            for path in self._report_paths(settings, old_target_ids, common).values()
-        }
-        new_report_paths = self._report_paths(settings, new_target_ids, common)
-        new_report_keys = {
-            self._path_key(path) for path in new_report_paths.values()
-        }
-        for key in old_report_keys - new_report_keys:
-            new_manifest.pop(key, None)
-            self._invalid_paths.discard(key)
-
-        for target_id, path in new_report_paths.items():
-            key = self._path_key(path)
-            if key in reports:
-                new_reports[key] = reports[key]
-                continue
-            if not path.exists():
-                continue
-            try:
-                new_reports[key] = repository.load_report_partition(path, target_id)
-                loaded_fingerprint = repository.loaded_report_fingerprints.get(key)
-                if loaded_fingerprint is not None:
-                    new_manifest[key] = FileFingerprint(*loaded_fingerprint)
-                reads += 1
-            except Exception as exc:
-                warnings.append(self._warning(path, exc))
-
-        comment_keys = set(comments)
-        for key in comment_keys:
-            new_manifest.pop(key, None)
-        new_target_set = set(new_target_ids)
-        if new_target_set:
-            for path in self._csv_files(settings.storage_dir("comments")):
-                key = self._path_key(path)
-                try:
-                    new_comments[key] = repository.load_comment_partition(
-                        path, new_target_set
-                    )
-                    fingerprint = self._fingerprint(path)
-                    if fingerprint is not None:
-                        new_manifest[key] = fingerprint
-                    reads += 1
-                except Exception as exc:
-                    old_frame = comments.get(key)
-                    if old_frame is not None:
-                        new_comments[key] = self._filter_comment_frame(
-                            old_frame, new_target_set
-                        )
-                    warnings.append(self._warning(path, exc))
-
-        return (
-            new_reports,
-            new_comments,
-            new_manifest,
-            tuple(warnings),
-            reads,
-        )
-
     def _scan_manifest(
         self,
         settings: AppSettings,
         target_employee_ids: tuple[str, ...],
         common: dict[str, list[dict[str, Any]]] | None = None,
+        directory_checks: dict[Path, Exception | None] | None = None,
+        common_paths: dict[str, Path] | None = None,
     ) -> dict[str, FileFingerprint]:
         manifest: dict[str, FileFingerprint] = {}
-        paths = [
-            *self._common_paths(settings).values(),
-            *self._report_paths(settings, target_employee_ids, common).values(),
-            *self._csv_files(settings.storage_dir("comments")),
-        ]
-        for path in paths:
+        checks = directory_checks if directory_checks is not None else {}
+        paths = list((common_paths if common_paths is not None else self._common_paths(settings)).values())
+        for label, scoped_paths in (
+            ("日報", self._report_paths(settings, target_employee_ids, common)),
+            ("上司コメント", self._comment_paths(settings, target_employee_ids, common)),
+        ):
+            for path in scoped_paths.values():
+                if self._directory_error(path.parent, label, checks) is None:
+                    paths.append(path)
+        for path in dict.fromkeys(paths):
             fingerprint = self._fingerprint(path)
             if fingerprint is not None:
                 manifest[self._path_key(path)] = fingerprint
@@ -1352,30 +1362,53 @@ class DailyReportDataCache:
                 )
         return paths
 
+    def _comment_paths(
+        self,
+        settings: AppSettings,
+        target_employee_ids: tuple[str, ...],
+        common: dict[str, list[dict[str, Any]]] | None,
+    ) -> dict[str, Path]:
+        repository = DailyReportRepository(settings, self._base_dir)
+        paths: dict[str, Path] = {}
+        for superior_id in repository._commenter_ids_for_targets(common or {}, list(target_employee_ids)):
+            try:
+                paths[superior_id] = safe_employee_csv_path(settings.storage_dir("comments"), superior_id)
+            except ValueError:
+                logger.warning("Ignoring invalid superior id from cached master: %r", superior_id)
+        return paths
+
+    def _common_fingerprints(self, paths: dict[str, Path]) -> dict[str, FileFingerprint | None]:
+        fingerprints = {path: self._fingerprint(path) for path in set(paths.values())}
+        return {master: fingerprints[path] for master, path in paths.items()}
+
     @staticmethod
-    def _csv_files(directory: Path) -> list[Path]:
-        if not directory.exists() or not directory.is_dir():
-            return []
-        return sorted(
-            (
-                path
-                for path in directory.glob("*.csv")
-                if path.is_file()
-                and not path.name.startswith((".", "~"))
-                and not path.name.lower().endswith((".bak.csv", ".tmp.csv"))
-            ),
-            key=lambda path: os.path.normcase(str(path)),
-        )
+    def _directory_error(
+        directory: Path, label: str, checks: dict[Path, Exception | None]
+    ) -> Exception | None:
+        # 1回の読み込み操作内だけ共有し、次回の更新では必ず確認し直す。
+        if directory not in checks:
+            try:
+                mode = directory.stat().st_mode
+                if not stat.S_ISDIR(mode):
+                    raise NotADirectoryError(f"{label}パスがフォルダではありません: {directory.name}")
+                if not os.access(directory, os.R_OK):
+                    raise PermissionError(f"{label}フォルダにアクセスできません: {directory.name}")
+                checks[directory] = None
+            except FileNotFoundError:
+                checks[directory] = FileNotFoundError(f"{label}フォルダが見つかりません: {directory.name}")
+            except OSError as exc:
+                checks[directory] = exc
+        return checks[directory]
 
     @staticmethod
     def _fingerprint(path: Path) -> FileFingerprint | None:
         try:
-            stat = path.stat()
+            file_stat = path.stat()
         except FileNotFoundError:
             return None
-        if not path.is_file():
+        if not stat.S_ISREG(file_stat.st_mode):
             return None
-        return FileFingerprint(size=stat.st_size, mtime_ns=stat.st_mtime_ns)
+        return FileFingerprint(size=file_stat.st_size, mtime_ns=file_stat.st_mtime_ns)
 
     @staticmethod
     def _path_key(path: Path | str) -> str:

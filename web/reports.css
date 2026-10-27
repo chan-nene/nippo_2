@@ -2354,6 +2354,7 @@ html body .conversation-card-header {
 }
 html body .conversation-card-header:has(.conversation-reaction-toggle, .conversation-reaction-badge) {
   padding-right: 22px;
+  min-height: 20px;
 }
 html body .conversation-author {
   flex: 1;
@@ -2372,7 +2373,7 @@ html body .conversation-reaction-badge {
   top: 2px;
   right: 2px;
   width: 24px;
-  height: 16px;
+  height: 22px;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
@@ -2381,7 +2382,7 @@ html body .conversation-reaction-badge {
   border-radius: 8px;
   background: transparent;
   color: color-mix(in srgb, var(--text-muted) 80%, transparent);
-  font-size: 14px;
+  font-size: 18px;
   line-height: 1;
 }
 html body .conversation-reaction-toggle { cursor: pointer; }

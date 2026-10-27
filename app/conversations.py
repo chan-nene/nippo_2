@@ -155,11 +155,14 @@ def save_partition(repo,owner,side,reports,ops,common,expected_revision):
                 row=dict.fromkeys(columns,'');row.update(record_type='report',employee_id=owner,date=update['date'],business_name_rich_text=EMPTY_RICH_TEXT,business_detail_rich_text=EMPTY_RICH_TEXT);rows.append(row)
             row.update({k:v for k,v in update.items() if k in ('business_name','business_detail','business_name_rich_text','business_detail_rich_text')});row['updated_at']=now
         other={}
+        verified_peers=[]
         def peer_rows(subordinate,superior):
             peer=superior if side=='user' else subordinate
             if peer not in other:
                 peer_path=safe_employee_csv_path(repo.storage_dir('comments') if side=='user' else repo._report_directory_for_employee(peer,common),peer)
-                other[peer]=(repo.load_comment_partition(peer_path,None) if side=='user' else repo.load_report_partition(peer_path,peer)).to_dicts()
+                verified=repo.load_verified_peer_partition(peer_path,peer,'comment' if side=='user' else 'report')
+                other[peer]=verified.frame.to_dicts()
+                verified_peers.append(verified)
             return other[peer]
         for op in ops:
             sub,sup,daytext=op['subordinate_employee_id'],op['superior_employee_id'],op['date'];t=(sub,daytext,sup)
@@ -200,4 +203,4 @@ def save_partition(repo,owner,side,reports,ops,common,expected_revision):
         output=frame(rows,columns);validate_frame(output,owner,side)
         revision=repo._write_csv_atomically(output,path,'reports' if side=='user' else 'comments')
         stat=path.stat()
-        return path,output,revision,(stat.st_size,stat.st_mtime_ns)
+        return path,output,revision,(stat.st_size,stat.st_mtime_ns),verified_peers

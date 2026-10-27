@@ -20,6 +20,7 @@ from app.config import (
 )
 from app.data_cache import DailyReportDataCache
 from app.repository import (
+    AdministrationAccessDeniedError,
     CommonMasterConflictError,
     CsvFileLockedError,
     CsvReadonlyError,
@@ -35,7 +36,6 @@ from app.security import (
     validate_settings_request,
     validate_ui_state_request,
     validate_user_administration_save_request,
-    validate_user_team_references,
 )
 
 logger = logging.getLogger(__name__)
@@ -272,7 +272,7 @@ class DailyReportApi:
             if not self._storage_ready:
                 return self._storage_unavailable_response()
             data_cache = self._get_data_cache()
-            data, diagnostics = data_cache.load_view_data(
+            data, diagnostics, snapshot = data_cache.load_view_data(
                 self._settings,
                 self._employee_id,
                 start_date=payload.get("start_date"),
@@ -280,11 +280,13 @@ class DailyReportApi:
                 period_preset=payload.get("period_preset"),
                 force_refresh=bool(payload.get("force_refresh", False)),
             )
-            if not data_cache.is_employee_registered(
-                self._settings, self._employee_id
+            # 登録確認・設定表示も同じ取得結果を使い、障害時の再試行を重ねない。
+            if not any(
+                str(row.get("employee_id", "")).strip() == self._employee_id
+                for row in snapshot.common.get("user_master", [])
             ):
                 return self._employee_access_denied()
-            settings_context = self._build_settings_context()
+            settings_context = self._build_settings_context(common=snapshot.common)
             data["allowed_member_filter_levels"] = settings_context[
                 "allowed_member_filter_levels"
             ]
@@ -302,42 +304,22 @@ class DailyReportApi:
     def load_common_masters(self, payload: Any = None) -> dict[str, Any]:
         try:
             payload = validate_load_request(payload)
-            if not self._is_admin():
-                return self._admin_access_denied()
-            access_denied = self._registered_employee_access_denied()
-            if access_denied:
-                return access_denied
             if not self._storage_ready:
                 return self._storage_unavailable_response()
             repo = DailyReportRepository(self._settings, self._base_dir)
             repo.validate_paths()
-            data_cache = self._get_data_cache()
-            cache_access = None
-            if payload["force_refresh"] or data_cache.is_loaded:
-                cache_access = (
-                    data_cache.refresh_changed(self._settings, self._employee_id)
-                    if payload["force_refresh"]
-                    else data_cache.ensure_loaded(self._settings, self._employee_id)
-                )
-                snapshot = cache_access.snapshot
-                data = snapshot.common
-                revisions = dict(snapshot.common_revisions)
-            else:
-                data = repo.load_common_masters()
-                revisions = repo.get_loaded_common_revisions()
+            data = repo.load_common_masters()
+            revisions = repo.get_loaded_common_revisions()
+            self._get_data_cache().defer_management_reload(revisions)
+            user = next((row for row in data.get("user_master", [])
+                         if str(row.get("employee_id", "")).strip() == self._employee_id), None)
+            if not self._user_is_admin(user):
+                return self._admin_access_denied()
             return {
                 "ok": True,
                 "data": data,
                 "revisions": revisions,
-                **(
-                    {
-                        "cache_status": cache_access.status,
-                        "refresh_result": cache_access.refresh_result.to_dict(),
-                        "cache_warning_count": len(cache_access.snapshot.warnings),
-                    }
-                    if cache_access is not None
-                    else {}
-                ),
+                "cache_warning_count": len(repo.load_warnings),
             }
         except StorageConfigError as exc:
             logger.error("Storage directory unavailable while loading common masters", exc_info=True)
@@ -353,10 +335,14 @@ class DailyReportApi:
                 return self._storage_unavailable_response()
             repo = DailyReportRepository(self._settings, self._base_dir)
             repo.validate_paths()
-            access_denied = self._registered_employee_access_denied(repo)
-            if access_denied:
-                return access_denied
-            return {"ok": True, "calendar": repo.load_calendar_master()}
+            common = repo.load_common()
+            employee_id = str(self._employee_id or "").strip()
+            if not employee_id or not any(
+                str(row.get("employee_id", "")).strip() == employee_id
+                for row in common.get("user_master", [])
+            ):
+                return self._employee_access_denied()
+            return {"ok": True, "calendar": common["calendar"]}
         except StorageConfigError as exc:
             logger.error("Storage directory unavailable while loading calendar", exc_info=True)
             return self._storage_operation_error(exc)
@@ -368,9 +354,6 @@ class DailyReportApi:
         try:
             if not self._is_admin():
                 return self._admin_access_denied()
-            access_denied = self._registered_employee_access_denied()
-            if access_denied:
-                return access_denied
             master, rows, revision = validate_common_master_save_request(payload)
             if master != "calendar":
                 raise RequestValidationError(
@@ -383,7 +366,7 @@ class DailyReportApi:
             new_revision = repo.save_common_master(
                 master, rows, expected_revision=revision
             )
-            self._refresh_data_cache_after_management_save("calendar saved")
+            self._defer_data_cache_reload_after_management_save("calendar saved")
             return {
                 "ok": True,
                 "message": "管理を保存しました。",
@@ -413,11 +396,6 @@ class DailyReportApi:
 
     def save_user_administration(self, payload: Any) -> dict[str, Any]:
         try:
-            if not self._is_admin():
-                return self._admin_access_denied()
-            access_denied = self._registered_employee_access_denied()
-            if access_denied:
-                return access_denied
             if isinstance(payload, dict) and "teams" in payload:
                 teams, users, comment_assignments, revisions = (
                     validate_administration_save_request(payload)
@@ -430,22 +408,20 @@ class DailyReportApi:
                 return self._storage_unavailable_response()
             repo = DailyReportRepository(self._settings, self._base_dir)
             repo.validate_paths()
-            self._validate_protected_administrator_changes(repo, users)
-            if teams is None:
-                validate_user_team_references(
-                    users, repo.load_common_masters().get("team_master", [])
-                )
             new_revisions = (
                 repo.save_administration(
                     teams,
                     users,
                     comment_assignments,
                     revisions,
+                    actor_employee_id=self._employee_id,
                 )
                 if teams is not None
-                else repo.save_user_administration(users, revisions)
+                else repo.save_user_administration(
+                    users, revisions, actor_employee_id=self._employee_id
+                )
             )
-            self._refresh_data_cache_after_management_save(
+            self._defer_data_cache_reload_after_management_save(
                 "organization administration saved"
             )
             return {
@@ -453,6 +429,8 @@ class DailyReportApi:
                 "message": "組織・ユーザー情報を保存しました。",
                 "revisions": new_revisions,
             }
+        except AdministrationAccessDeniedError:
+            return self._admin_access_denied()
         except CommonMasterConflictError:
             return {
                 "ok": False,
@@ -545,6 +523,16 @@ class DailyReportApi:
                     data_cache.invalidate_partition(
                         partition[0], "saved partition could not be applied"
                     )
+            needed_results = [status for status in result.values() if status.get("needed")]
+            if needed_results and all(status.get("saved") is True for status in needed_results):
+                peers = [peer for status in needed_results for peer in status.get("_cache_peers", [])]
+                if peers:
+                    try:
+                        if not data_cache.apply_verified_partitions(self._settings, self._employee_id, peers):
+                            cache_sync_failed = True
+                    except Exception:
+                        cache_sync_failed = True
+                        logger.exception("Failed to synchronize verified peer CSVs into cache")
             public_result = {
                 name: {
                     key: value
@@ -850,26 +838,10 @@ class DailyReportApi:
             self._data_cache = cache
         return cache
 
-    def _refresh_data_cache_after_management_save(self, reason: str) -> None:
-        data_cache = self._get_data_cache()
-        if not data_cache.is_loaded:
-            return
-        try:
-            access = data_cache.refresh_changed(
-                self._settings, self._employee_id
-            )
-            if access.refresh_result.failed:
-                logger.warning(
-                    "Management data saved with deferred cache refresh reason=%s failed=%s",
-                    reason,
-                    access.refresh_result.failed,
-                )
-        except Exception:
-            logger.exception(
-                "Failed to refresh daily-report cache after management save reason=%s",
-                reason,
-            )
-            data_cache.invalidate_all(f"management cache refresh failed: {reason}")
+    def _defer_data_cache_reload_after_management_save(self, reason: str) -> None:
+        # Save succeeds before this marker is set; defer all report I/O until entry.
+        self._get_data_cache().defer_management_reload()
+        logger.info("Daily-report reload deferred: %s", reason)
 
     @staticmethod
     def _admin_access_denied() -> dict[str, Any]:
@@ -933,23 +905,21 @@ class DailyReportApi:
         if not self._storage_ready:
             return False
         try:
-            user = self._current_user_master_row()
+            repo = DailyReportRepository(self._settings, self._base_dir)
+            repo.validate_paths()
+            common = repo.load_organization_masters()
+            employee_id = str(self._employee_id or "").strip()
+            if not employee_id:
+                return False
+            user = next(
+                (row for row in common.get("user_master", [])
+                 if str(row.get("employee_id", "")).strip() == employee_id),
+                None,
+            )
         except Exception:
             logger.exception("Failed to check administrator permission")
             return False
         return self._user_is_admin(user)
-
-    def _validate_protected_administrator_changes(
-        self, repo: DailyReportRepository, users: list[dict[str, Any]]
-    ) -> None:
-        current_user = self._current_user_master_row(repo)
-        if not self._user_is_admin(current_user):
-            return
-        employee_id = str(self._employee_id or "").strip()
-        if not any(
-            str(row.get("employee_id", "")).strip() == employee_id for row in users
-        ):
-            raise RequestValidationError("ログイン中の管理者は削除できません。")
 
     @staticmethod
     def _user_is_admin(user: dict[str, Any] | None) -> bool:

@@ -1450,7 +1450,7 @@ html body[data-font-size] {
 
 html body[data-font-size]
   :is(
-    button,
+    button:not(:where(.conversation-reaction-toggle)),
     input,
     textarea,
     select,
