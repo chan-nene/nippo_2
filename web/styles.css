@@ -133,7 +133,7 @@
   --radius-sm: 5px;
   --radius-md: 8px;
   --radius-control: 8px;
-  --title-height: 54px;
+  --title-height: 44px;
   --sidebar-closed: 80px;
   --toolbar-height: 48px;
   --table-row-height: 42px;
@@ -1547,8 +1547,7 @@ html body :is(
 
 /* Platform-style graphite shell. */
 html body .title-bar {
-  height: 56px;
-  flex-basis: 56px;
+  height: var(--title-height);
   background: var(--title-bar-bg);
 }
 

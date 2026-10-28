@@ -3,6 +3,9 @@
 /* Command bar */
 
 html body #reportPanel {
+  /* Match report controls and headers to the reduced 11–15px type scale. */
+  --control-height: 28px;
+  --table-header-height: 30px;
   --table-divider-border: color-mix(in srgb, var(--table-border) 80%, var(--border-strong));
   --weekday-sat: #2563eb;
   --weekday-sun: var(--danger-icon);
@@ -18,18 +21,26 @@ html body #reportPanel {
 }
 
 html body[data-font-size="compact"] #reportPanel {
+  --control-height: 26px;
+  --table-header-height: 28px;
   --report-regular-row-height: 53px;
 }
 
 html body[data-font-size="medium"] #reportPanel {
+  --control-height: 30px;
+  --table-header-height: 32px;
   --report-regular-row-height: 61px;
 }
 
 html body[data-font-size="large"] #reportPanel {
+  --control-height: 32px;
+  --table-header-height: 34px;
   --report-regular-row-height: 64px;
 }
 
 html body[data-font-size="xlarge"] #reportPanel {
+  --control-height: 34px;
+  --table-header-height: 36px;
   --report-regular-row-height: 67px;
 }
 
@@ -1207,8 +1218,8 @@ html body #tableWrap table td :is(.user-content, .editable-content, .comment-sta
 
 /* Report control and table geometry. */
 html body #reportPanel .toolbar-filter-row {
-  min-height: 58px;
-  padding: 12px 18px 10px;
+  min-height: calc(var(--control-height) + 16px);
+  padding: 8px 18px;
 }
 
 html body #reportPanel .period-field-group {
@@ -1828,7 +1839,7 @@ html body #reportPanel .member-switch-list {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
-  padding-bottom: 10px;
+  padding-bottom: 6px;
 }
 
 html body #reportPanel #bossSearchControl > #showSelfButton {
@@ -1848,7 +1859,7 @@ html body #reportPanel .member-switch-bar {
   align-items: flex-start;
   border-bottom: 0;
   background: transparent;
-  padding: 12px 18px 14px;
+  padding: 8px 18px;
 }
 
 html body #reportPanel .member-switch-button {
@@ -1859,7 +1870,7 @@ html body #reportPanel .member-switch-button {
   width: max-content;
   max-width: min(220px, 100%);
 
-  min-height: 28px;
+  min-height: var(--control-height);
   height: var(--control-height);
   align-items: center;
   justify-content: center;
