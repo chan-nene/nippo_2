@@ -974,6 +974,12 @@ html body .font-size-control {
   align-items: center;
 }
 
+/* The status-only startup modal receives focus from showModal(), but has no
+   interactive control that needs a focus ring. Keep modal focus behavior. */
+html body #startupDialog:focus {
+  outline: none;
+}
+
 /* Confirmation dialog */
 
 html body .confirmation-dialog {

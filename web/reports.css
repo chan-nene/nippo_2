@@ -1023,7 +1023,6 @@ html body .reply-section.is-collapsed .reply-toggle-button {
   min-height: 20px;
   background: var(--surface);
   color: var(--action-secondary-hover-fg);
-  border-color: var(--primary-border);
   box-shadow: 0 2px 5px #0003;
 }
 
