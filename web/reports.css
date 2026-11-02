@@ -1116,6 +1116,14 @@ html body .table-content table {
 /* SVG icon system */
 
 /* Limited rich text keeps the same cell and card geometry as plain text. */
+/* Names, dates, and body text use the browser baseline. Keep the shared
+   optical offset for column headers, reply authors, and action controls. */
+html body #reportPanel tbody .user-content,
+html body #reportPanel tbody .date-content,
+html body .editable-content {
+  --ui-text-offset-y: 0px;
+}
+
 html body .editable-content p {
   margin: 0;
   padding: 0;
