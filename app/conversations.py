@@ -8,11 +8,11 @@ from app.sqlite_table import Table
 from app.rich_text import EMPTY_RICH_TEXT, serialize
 from app.security import validate_employee_id, safe_employee_csv_path, RequestValidationError
 
-FIELDS = ['message_id','message_kind','message_text','message_rich_text','target_author_employee_id','target_message_id','reaction_type','created_at','updated_at','deleted_at']
+FIELDS = ['author_employee_id','message_id','message_kind','message_text','message_rich_text','target_author_employee_id','target_message_id','reaction_type','created_at','updated_at','deleted_at']
 USER_COLUMNS = ['record_type','employee_id','date','business_name','business_name_rich_text','business_detail','business_detail_rich_text','superior_employee_id',*FIELDS]
 COMMENT_COLUMNS = ['record_type','superior_employee_id','subordinate_employee_id','date',*FIELDS]
-USER_KEYS = ['record_type','employee_id','date','superior_employee_id','message_id','target_author_employee_id','target_message_id']
-COMMENT_KEYS = ['record_type','superior_employee_id','subordinate_employee_id','date','message_id','target_author_employee_id','target_message_id']
+USER_KEYS = ['author_employee_id','record_type','employee_id','date','superior_employee_id','message_id','target_author_employee_id','target_message_id']
+COMMENT_KEYS = ['author_employee_id','record_type','superior_employee_id','subordinate_employee_id','date','message_id','target_author_employee_id','target_message_id']
 VIEW_USERS = ['record_type','employee_id','date','business_name','business_name_rich_text','business_detail','business_detail_rich_text','reply_to_employee_id','reply_text','reply_rich_text','updated_at']
 VIEW_COMMENTS = ['superior_employee_id','subordinate_employee_id','date','comment','comment_rich_text','updated_at']
 REACTIONS = {'like','understood','cry','bow'}
@@ -39,7 +39,7 @@ def thread(row, side):
     return (row['employee_id'] if side=='user' else row['subordinate_employee_id'],row['date'],row['superior_employee_id'])
 
 def author(row,side):
-    return row['employee_id'] if side=='user' else row['superior_employee_id']
+    return row['employee_id'] if row['record_type']=='report' and side=='user' else row['author_employee_id']
 
 def validate_frame(df, owner, side):
     columns=USER_COLUMNS if side=='user' else COMMENT_COLUMNS
@@ -59,6 +59,8 @@ def validate_frame(df, owner, side):
         if kind not in ('message','reaction'): raise ValueError('行種別が不正です。')
         subordinate,_,superior=thread(r,side)
         validate_employee_id(subordinate); validate_employee_id(superior)
+        if side=='user' and author(r,side)!=subordinate: raise ValueError('日報CSVの投稿者が本人と一致しません。')
+        if side=='comment' and author(r,side)==subordinate: raise ValueError('本人の返信は日報CSVへ保存してください。')
         if subordinate==superior: raise ValueError('自分自身との会話は作成できません。')
         if side=='user' and any(r[k] for k in ('business_name','business_name_rich_text','business_detail','business_detail_rich_text')): raise ValueError('会話行に日報本文があります。')
         timestamp(r['created_at']);timestamp(r['updated_at'])
@@ -67,6 +69,7 @@ def validate_frame(df, owner, side):
             if r['message_id'] in ids: raise ValueError('メッセージIDが重複しています。')
             ids.add(r['message_id'])
             if r['message_kind'] not in ('initial_comment','reply') or (side=='user' and r['message_kind']!='reply'): raise ValueError('メッセージ種別が不正です。')
+            if r['message_kind']=='initial_comment' and author(r,side)!=superior: raise ValueError('初回コメントはその列の上司だけが作成できます。')
             if r['message_kind']=='initial_comment' and not r['deleted_at']:
                 t=thread(r,side)
                 if t in initials: raise ValueError('先頭コメントが重複しています。')
@@ -78,7 +81,7 @@ def validate_frame(df, owner, side):
             if any(r[k] for k in ('message_id','message_kind','message_text','message_rich_text','deleted_at')): raise ValueError('リアクション行に本文があります。')
             uuid(r['target_message_id']);validate_employee_id(r['target_author_employee_id'])
             if r['reaction_type'] not in REACTIONS: raise ValueError('リアクションが不正です。')
-            if r['target_author_employee_id'] != (superior if side=='user' else subordinate): raise ValueError('相手の投稿のみリアクションできます。')
+            if r['target_author_employee_id'] == author(r,side): raise ValueError('相手の投稿のみリアクションできます。')
 
 def project_users(df):
     return df.where("record_type = 'report'").ensure_columns(VIEW_USERS)
@@ -100,12 +103,12 @@ def conversation_index(users,comments):
             if r['record_type']=='reaction': reactions.append((thread(r,side),r));continue
             groups[thread(r,side)].append({k:r[k] for k in ('message_id','message_kind','created_at','updated_at','deleted_at')} | {
                 'author_employee_id':author(r,side),'message_text':'' if r['deleted_at'] else r['message_text'],
-                'message_rich_text':EMPTY_RICH_TEXT if r['deleted_at'] else r['message_rich_text'],'reaction_type':''})
+                'message_rich_text':EMPTY_RICH_TEXT if r['deleted_at'] else r['message_rich_text'],'reactions':[]})
     for t,items in groups.items():
         items.sort(key=lambda m:(m['message_kind']!='initial_comment',datetime.fromisoformat(m['created_at'].replace('Z','+00:00')),m['author_employee_id'],m['message_id']))
     for t,r in reactions:
         for m in groups.get(t,[]):
-            if not m['deleted_at'] and (m['author_employee_id'],m['message_id'])==(r['target_author_employee_id'],r['target_message_id']): m['reaction_type']=r['reaction_type']
+            if not m['deleted_at'] and (m['author_employee_id'],m['message_id'])==(r['target_author_employee_id'],r['target_message_id']): m['reactions'].append({'author_employee_id':r['author_employee_id'],'reaction_type':r['reaction_type']})
     return groups
 
 def validate_operations(value):
@@ -156,26 +159,30 @@ def save_partition(repo,owner,side,reports,ops,common,expected_revision):
             row.update({k:v for k,v in update.items() if k in ('business_name','business_detail','business_name_rich_text','business_detail_rich_text')});row['updated_at']=now
         other={}
         verified_peers=[]
-        def peer_rows(subordinate,superior):
-            peer=superior if side=='user' else subordinate
-            if peer not in other:
-                peer_path=safe_employee_csv_path(repo.storage_dir('comments') if side=='user' else repo._report_directory_for_employee(peer,common),peer)
-                verified=repo.load_verified_peer_partition(peer_path,peer,'comment' if side=='user' else 'report')
-                other[peer]=verified.frame.to_dicts()
+        def peer_rows(peer, peer_side):
+            if peer==owner and peer_side==side:
+                return rows
+            key=(peer,peer_side)
+            if key not in other:
+                peer_path=safe_employee_csv_path(repo.storage_dir('comments') if peer_side=='comment' else repo._report_directory_for_employee(peer,common),peer)
+                verified=repo.load_verified_peer_partition(peer_path,peer,'comment' if peer_side=='comment' else 'report')
+                other[key]=verified.frame.to_dicts()
                 verified_peers.append(verified)
-            return other[peer]
+            return other[key]
         for op in ops:
             sub,sup,daytext=op['subordinate_employee_id'],op['superior_employee_id'],op['date'];t=(sub,daytext,sup)
-            peers=peer_rows(sub,sup)
             local=[r for r in rows if r['record_type']!='report' and thread(r,side)==t]
-            peer_side='comment' if side=='user' else 'user'
-            remote=[r for r in peers if r['record_type']!='report' and thread(r,peer_side)==t]
-            initial=next((r for r in [*local,*remote] if r['record_type']=='message' and r['message_kind']=='initial_comment'),None)
-            base=dict.fromkeys(columns,'');base.update(date=daytext,superior_employee_id=sup)
+            origin=[r for r in peer_rows(sup,'comment') if r['record_type']!='report' and thread(r,'comment')==t]
+            initial=next((r for r in origin if r['record_type']=='message' and r['message_kind']=='initial_comment'),None)
+            base=dict.fromkeys(columns,'');base.update(date=daytext,superior_employee_id=sup,author_employee_id=owner)
             base['employee_id' if side=='user' else 'subordinate_employee_id']=sub
             action=op['action']
             if action=='react':
-                target=next((r for r in remote if r['record_type']=='message' and r['message_id']==op['target_message_id'] and author(r,peer_side)==op['target_author_employee_id']),None)
+                target_author=op['target_author_employee_id']
+                if target_author==owner: raise ValueError('自分の投稿にはリアクションできません。')
+                target_side='user' if target_author==sub else 'comment'
+                remote=peer_rows(target_author,target_side)
+                target=next((r for r in remote if r['record_type']=='message' and thread(r,target_side)==t and r['message_id']==op['target_message_id'] and author(r,target_side)==target_author),None)
                 if target is None or target['deleted_at']: raise ValueError('リアクション対象が存在しないか削除されています。')
                 if target['message_kind'] != 'reply': raise ValueError('初回コメントにはリアクションできません。')
                 prev=next((r for r in local if r['record_type']=='reaction' and r['target_message_id']==op['target_message_id'] and r['target_author_employee_id']==op['target_author_employee_id']),None)
@@ -190,7 +197,7 @@ def save_partition(repo,owner,side,reports,ops,common,expected_revision):
                     if any(existing_message[k]!=op[k] for k in ('message_text','message_rich_text','created_at')) or existing_message['deleted_at']: raise ValueError('同じIDに異なる投稿が保存されています。')
                     continue
                 if op['message_kind']=='initial_comment':
-                    if side!='comment' or any(r['record_type']=='message' and r['message_kind']=='initial_comment' and not r['deleted_at'] for r in [*local,*remote]): raise ValueError('最初のコメントは上司が1件だけ作成できます。')
+                    if side!='comment' or owner!=sup or any(r['record_type']=='message' and r['message_kind']=='initial_comment' and not r['deleted_at'] for r in origin): raise ValueError('最初のコメントは上司が1件だけ作成できます。')
                 elif initial is None: raise ValueError('最初の上司コメントがありません。')
                 base.update(record_type='message',message_id=op['message_id'],message_kind=op['message_kind'],message_text=op['message_text'],message_rich_text=op['message_rich_text'],created_at=op['created_at'],updated_at=op['created_at']);rows.append(base)
             else:

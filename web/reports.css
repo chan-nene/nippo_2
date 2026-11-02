@@ -2346,7 +2346,7 @@ html body #reportPanel .date-value > span {
 
 /* Message cards share the existing reply geometry. Initial comments stay embedded. */
 html body .conversation-card { position: relative; min-width: 0; }
-html body .conversation-card.reply-card { margin: 6px 8px; width: auto; display: block; padding-top: 4px; }
+html body .conversation-card.reply-card { margin: 6px 8px; width: auto; display: block; padding-top: 4px; padding-bottom: 4px; }
 /* Keep the first reply close to the embedded initial comment. */
 html body .conversation-initial + .conversation-card.reply-card {
   margin-top: 0;
@@ -2369,11 +2369,11 @@ html body .conversation-card-header {
   gap: 4px;
   min-width: 0;
   min-height: 14px;
-  margin-bottom: 4px;
+  margin-bottom: 7px;
 }
-html body .conversation-card-header:has(.conversation-reaction-toggle, .conversation-reaction-badge) {
-  padding-right: 22px;
+html body .conversation-card-header:has(.conversation-reactions) {
   min-height: 20px;
+  padding-right: 0;
 }
 html body .conversation-author {
   flex: 1;
@@ -2388,20 +2388,22 @@ html body .conversation-author {
 html body .conversation-reaction-toggle,
 html body .conversation-reaction-badge {
   display: inline-flex;
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 24px;
-  height: 22px;
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 22px;
+  width: auto;
+  height: 20px;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  padding: 0;
+  padding: 0 2px;
+  gap: 0px;
+  font-family: inherit;
   border: 1px solid color-mix(in srgb, var(--text-muted) 30%, transparent);
-  border-radius: 8px;
+  border-radius: 5px;
   background: transparent;
-  color: color-mix(in srgb, var(--text-muted) 80%, transparent);
-  font-size: 18px;
+  color: var(--text-muted);
+  font-size: 14px;
   line-height: 1;
 }
 html body .conversation-reaction-toggle { cursor: pointer; }
@@ -2419,17 +2421,54 @@ html body .conversation-reaction-badge {
   border-color: transparent;
 }
 html body .conversation-card:has(.is-editing) .conversation-reaction-toggle { visibility: hidden; }
-html body .conversation-float-menu { position: fixed; z-index: 310; display: flex; padding: 4px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 3px 12px #0003; }
+html body .conversation-float-menu { position: fixed; z-index: 310; display: block; max-width: calc(100vw - 8px); max-height: min(360px, calc(100vh - 8px)); overflow: auto; padding: 4px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 3px 12px #0003; }
 html body .conversation-float-menu[hidden] { display: none; }
 html body .conversation-float-menu button { width: 36px; height: 32px; border: 0; border-radius: 4px; background: transparent; cursor: pointer; font-size: 20px; }
 html body .conversation-float-menu button:is(:hover,[aria-pressed="true"]) { background: var(--table-header-bg); box-shadow: inset 0 0 0 1px var(--border-strong); }
 
-/* Superior replies have a neutral tint and a slightly darker border. */
+/* Reactions stay in the existing header; a measured compact button replaces
+   the full group before it collides with the author. Hidden copies cannot focus. */
+html body .conversation-reactions { display: flex; align-items: center; flex: 0 0 auto; max-width: 100%; position: relative; }
+html body .conversation-reactions-full { display: flex; align-items: center; gap: 1px; white-space: nowrap; }
+html body .conversation-reactions-compact { display: none; }
+html body .conversation-card-header.is-compact .conversation-reactions-full {
+  position: absolute; right: 0; top: 0; visibility: hidden; pointer-events: none;
+}
+html body .conversation-card-header.is-compact .conversation-reactions-compact { display: flex; }
+html body .conversation-card-header.is-compact .conversation-author { flex-basis: 0; }
+html body :is(.conversation-reaction-toggle, .conversation-reaction-badge) small { font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 18px; }
+html body .conversation-reaction-toggle.is-selected {
+  border-color: color-mix(in srgb, var(--border-strong) 45%, transparent);
+  background: color-mix(in srgb, var(--text-muted) 6%, transparent);
+}
+html body .conversation-reaction-choices { display: flex; gap: 2px; }
+/* At the 40px column minimum, use the card's outer inset for the control. */
+html body .conversation-card-header.is-tiny { margin-inline: -7px; gap: 0; }
+html body .conversation-card-header.is-tiny .conversation-author { width: 0; flex: 0 0 0; }
+html body .conversation-card-header.is-tiny .conversation-reactions { margin-left: auto; }
+html body .conversation-card-header.is-tiny :is(.conversation-reaction-toggle, .conversation-reaction-badge) { min-width: 20px; font-size: 14px; }
+html body .conversation-card-header.is-tiny :is(.conversation-reaction-toggle, .conversation-reaction-badge) { width: 20px; padding: 0; gap: 0; align-items: flex-start; }
+html body .conversation-card-header.is-tiny :is(.conversation-reaction-toggle, .conversation-reaction-badge) small {
+  position: absolute; right: 0; bottom: 0; font-size: 8px; line-height: 1;
+  background: var(--table-cell-bg); border-radius: 2px;
+}
+
+/* Reference-supervisor replies are neutral; other supervisors are pale yellow. */
 html body #reportPanel .conversation-card.reply-card.is-superior {
   --superior-reply-bg: color-mix(in srgb, var(--table-cell-bg) 94%, var(--text) 6%);
   background-color: var(--superior-reply-bg);
   border-color: color-mix(in srgb, var(--superior-reply-bg) 92%, #000 8%);
   color: var(--text);
+}
+html body #reportPanel .conversation-card.reply-card.is-guest-superior {
+  --superior-reply-bg: color-mix(in srgb, var(--table-cell-bg) 90%, #e7bd45 10%);
+  color: #865b32;
+}
+html body #reportPanel .conversation-card:is(.is-guest-superior, .is-subordinate) .conversation-author {
+  color: inherit;
+}
+html[data-theme="dark"] body #reportPanel .conversation-card.reply-card.is-guest-superior {
+  color: #d6b28b;
 }
 html body .comment-stack:has(> .conversation-initial .boss-content.is-editing) > .boss-comment-actions {
   opacity: 0;

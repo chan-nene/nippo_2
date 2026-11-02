@@ -418,8 +418,16 @@ class DailyReportDataCache:
     def get_save_context(
         self, settings: AppSettings, employee_id: str
     ) -> dict[str, list[dict[str, Any]]]:
-        snapshot = self.ensure_loaded(settings, employee_id).snapshot
-        return snapshot.common
+        with self._lock:
+            snapshot = self.ensure_loaded(settings, employee_id).snapshot
+            paths = self._common_paths(settings)
+            if any(self._fingerprint(path) != snapshot.file_manifest.get(self._path_key(path))
+                   for path in set(paths.values())):
+                # Never authorize a write with stale assignments or a failed-refresh fallback.
+                common = self.read_startup_common(settings, employee_id)
+                self.invalidate_all('save authorization masters changed')
+                return common
+            return snapshot.common
 
     def saved_comment_view(
         self, settings: AppSettings, employee_id: str, target_ids: list[str],
@@ -1375,6 +1383,17 @@ class DailyReportDataCache:
                 paths[superior_id] = safe_employee_csv_path(settings.storage_dir("comments"), superior_id)
             except ValueError:
                 logger.warning("Ignoring invalid superior id from cached master: %r", superior_id)
+        # Former commenters can still own replies in a current commenter's thread.
+        # Enumerate names; the existing fingerprint cache only rereads changed CSVs.
+        if paths:
+            try:
+                for path in settings.storage_dir("comments").glob("*.csv"):
+                    try:
+                        paths[path.stem] = safe_employee_csv_path(settings.storage_dir("comments"), path.stem)
+                    except ValueError:
+                        logger.warning("Ignoring invalid comment filename: %s", path.name)
+            except OSError:
+                logger.warning("Failed to enumerate historical comment files", exc_info=True)
         return paths
 
     def _common_fingerprints(self, paths: dict[str, Path]) -> dict[str, FileFingerprint | None]:

@@ -1190,10 +1190,12 @@ class DailyReportRepository:
                 raise PermissionError('現在のコメント担当の会話だけ更新できます。')
             if employee_id == sub and self._user_can_input_own_report(user):
                 side = 'user'
-            elif employee_id == sup and sub in assigned and not self._is_temporary_user(user):
+            elif sub in assigned and not self._is_temporary_user(user):
                 side = 'comment'
             else:
                 raise PermissionError('この会話を更新する権限がありません。')
+            if op.get('message_kind') == 'initial_comment' and employee_id != sup:
+                raise PermissionError('初回コメントはその列の上司だけが更新できます。')
             grouped[side].append(op)
         result = {}
         for side in ('user','comment'):
@@ -1525,9 +1527,18 @@ class DailyReportRepository:
                 key = (cell.pop("employee_id"), cell.pop("date"))
                 cells_by_key.setdefault(key, []).append(cell)
         # Nested UI payloads stay Python objects at the API boundary.
+        for messages in conversations.values():
+            for message in messages:
+                message['author_name'] = user_master.get(message['author_employee_id'], {}).get('display_name') or message['author_employee_id']
+                for reaction in message['reactions']:
+                    reaction['author_name'] = user_master.get(reaction['author_employee_id'], {}).get('display_name') or reaction['author_employee_id']
         result_rows = rows.to_dicts()
         for row in result_rows:
             row["comments"] = cells_by_key.get((row["employee_id"], row["date"]), [])
+            for cell in row['comments']:
+                cell['can_participate'] = bool(cell['applies'] and cell['available']
+                    and employee_id not in failed_comment_ids
+                    and (row['can_edit_report'] or row['can_edit_my_comment']))
             row["conversation_data"] = json.dumps({cell["superior_employee_id"]: conversations.get(
                 (row["employee_id"], row["date"], cell["superior_employee_id"]), [])
                 for cell in row["comments"] if cell["applies"] and cell["available"]}, ensure_ascii=False)

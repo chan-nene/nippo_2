@@ -12,6 +12,14 @@ const TABLE_COLUMN_WIDTH_PROFILES = Object.freeze({
   large: { user: 112, date: 120, name: 330, detail: 630, comment: 212 },
   xlarge: { user: 124, date: 132, name: 360, detail: 690, comment: 230 },
 });
+// Four full-width name characters plus cell padding; dates include weekday and padding.
+const TABLE_FIT_COLUMN_WIDTH_PROFILES = Object.freeze({
+  compact: { user: 62, date: 80 },
+  standard: { user: 70, date: 88 },
+  medium: { user: 76, date: 96 },
+  large: { user: 82, date: 104 },
+  xlarge: { user: 90, date: 116 },
+});
 const TABLE_COLUMN_MIN_WIDTH_PROFILES = Object.freeze({
   // 折り返しを許容して画面内に収める。40pxは列幅設定の保存可能な下限。
   compact: { user: 40, date: 40, name: 40, detail: 40, comment: 40 },
@@ -2367,7 +2375,7 @@ function handleColumnResizeKeydown(event, handle) {
   return true;
 }
 
-// 名前・日付は標準幅を優先し、残りを業務名:業務詳細:各上司=1.5:2.5:1で配分する。
+// 名前は全角4文字、日付は曜日まで1行に収まる幅を確保し、残りを配分する。
 function fitColumnWidthsToViewport() {
   const scroll = document.querySelector("#tableWrap .table-scroll");
   if (!scroll || scroll.clientWidth === 0) return;
@@ -2377,18 +2385,13 @@ function fitColumnWidthsToViewport() {
   const tableStyle = getComputedStyle(scroll.querySelector("table"));
   const borderWidth = parseFloat(tableStyle.borderLeftWidth) + parseFloat(tableStyle.borderRightWidth);
   let remaining = Math.floor(scroll.clientWidth - borderWidth);
-  // Manual drag limits must not become the preferred widths for automatic fitting.
-  const defaults = TABLE_COLUMN_WIDTH_PROFILES[state.fontSize];
-  const fixed = columns.filter(col => col.dataset.columnKind === 'user');
-  // Automatic fitting keeps the full date and weekday on one line. Manual limits stay at 40px.
-  const minimumTotal = columns.reduce((sum, col) => sum + (col.dataset.columnKind === "date" ? defaults.date : minimums[col.dataset.columnKind]), 0);
-  const preferredExtra = fixed.reduce((sum, col) => sum + defaults[col.dataset.columnKind] - minimums[col.dataset.columnKind], 0);
-  const fixedScale = preferredExtra ? Math.min(1, Math.max(0, (remaining - minimumTotal) / preferredExtra)) : 0;
+  // Keep these widths even when the viewport requires horizontal scrolling.
+  const fitWidths = TABLE_FIT_COLUMN_WIDTH_PROFILES[state.fontSize];
   let flexible = [];
   for (const column of columns) {
     const { columnId, columnKind } = column.dataset;
     if (columnKind === "user" || columnKind === "date") {
-      remaining -= setTableColumnWidth(columnId, columnKind, columnKind === "date" ? defaults.date : minimums[columnKind] + Math.floor((defaults[columnKind] - minimums[columnKind]) * fixedScale));
+      remaining -= setTableColumnWidth(columnId, columnKind, fitWidths[columnKind]);
     } else {
       const weight = columnKind === "detail" ? 2.5 : columnKind === "name" ? 1.5 : 1;
       flexible.push({ id: columnId, kind: columnKind, weight });
@@ -3156,7 +3159,7 @@ async function saveUpdates() {
   }
 
   const conversationUser=conversationEntries.some(({op})=>op.subordinate_employee_id===state.employeeId);
-  const conversationComment=conversationEntries.some(({op})=>op.superior_employee_id===state.employeeId);
+  const conversationComment=conversationEntries.some(({op})=>op.subordinate_employee_id!==state.employeeId);
   const userSaved =
     (reportEntries.length === 0 && !conversationUser) || result?.result?.user?.saved === true;
   const commentSaved =

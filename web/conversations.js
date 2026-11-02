@@ -19,7 +19,7 @@ function hydrateConversations() {
   }
 }
 function conversationBase(row,cell) { return {subordinate_employee_id:row.employee_id,superior_employee_id:cell.superior_employee_id,date:row.date}; }
-function canParticipate(row,cell) { return cell.applies!==false && cell.available!==false && (row.can_edit_report || cell.editable); }
+function canParticipate(row,cell) { return cell.applies!==false && cell.available!==false && (cell.can_participate ?? (row.can_edit_report || cell.editable)); }
 function messageOperation(row,cell,message,action) {
   return {...conversationBase(row,cell),action,message_id:message.message_id,message_kind:message.message_kind,
     ...(action==='delete' ? {} : {message_text:message.message_text,message_rich_text:message.message_rich_text}),
@@ -51,10 +51,10 @@ function reapplyConversationDrafts() {
     cell.messages ||= [];
     if(op.action==='react') {
       const m=cell.messages.find(m=>m.author_employee_id===op.target_author_employee_id && m.message_id===op.target_message_id);
-      if(m && !m.deleted_at)m.reaction_type=op.reaction_type;
+      if(m && !m.deleted_at)setOwnConversationReaction(m,op.reaction_type);
     } else {
       let m=cell.messages.find(m=>m.author_employee_id===state.employeeId && m.message_id===op.message_id);
-      if(!m && op.action==='create') { m={author_employee_id:state.employeeId,message_id:op.message_id,message_kind:op.message_kind,created_at:op.created_at,updated_at:op.created_at,deleted_at:'',reaction_type:'',is_new:true};cell.messages.push(m); }
+      if(!m && op.action==='create') { m={author_employee_id:state.employeeId,message_id:op.message_id,message_kind:op.message_kind,created_at:op.created_at,updated_at:op.created_at,deleted_at:'',reactions:[],is_new:true};cell.messages.push(m); }
       if(m) {if(op.action==='delete'){m.message_text='';m.message_rich_text=plainRichText('');}else Object.assign(m,{message_text:op.message_text,message_rich_text:op.message_rich_text});}
     }
     syncConversationInitial(cell);
@@ -62,7 +62,7 @@ function reapplyConversationDrafts() {
 }
 function newConversationMessage(kind) {
   const stamp=new Date().toISOString();
-  return {message_id:crypto.randomUUID(),author_employee_id:state.employeeId,message_kind:kind,message_text:'',message_rich_text:plainRichText(''),created_at:stamp,updated_at:stamp,deleted_at:'',reaction_type:'',is_new:true};
+  return {message_id:crypto.randomUUID(),author_employee_id:state.employeeId,message_kind:kind,message_text:'',message_rich_text:plainRichText(''),created_at:stamp,updated_at:stamp,deleted_at:'',reactions:[],is_new:true};
 }
 function isSavedConversationMessage(message) {
   return message.saved_present ?? (!message.is_new && !message.deleted_at);
@@ -87,7 +87,7 @@ function commitSavedConversationOperation(op) {
   let message=cell.messages?.find(m=>m.author_employee_id===state.employeeId && m.message_id===op.message_id);
   if(!message && op.action==='create') {
     // An emptied new reply may already have been removed from the rendered draft.
-    message={message_id:op.message_id,message_kind:op.message_kind,created_at:op.created_at,author_employee_id:state.employeeId,message_text:'',message_rich_text:plainRichText(''),deleted_at:'',reaction_type:''};
+    message={message_id:op.message_id,message_kind:op.message_kind,created_at:op.created_at,author_employee_id:state.employeeId,message_text:'',message_rich_text:plainRichText(''),deleted_at:'',reactions:[]};
     (cell.messages ||= []).push(message);
   }
   if(!message)return;
@@ -128,6 +128,44 @@ function isConversationMessageDirty(row,cell,message) {
   const reaction={...conversationBase(row,cell),action:'react',target_author_employee_id:message.author_employee_id,target_message_id:message.message_id};
   return state.conversationChanges.has(conversationDraftKey(edit)) || state.conversationChanges.has(conversationDraftKey(reaction));
 }
+function conversationAuthorName(row,cell,id,name) {
+  return name || (id===row.employee_id ? row.display_name : row.comments?.find(c=>c.superior_employee_id===id)?.superior_name) || id;
+}
+function ownConversationReaction(message) {
+  return (message.reactions || []).find(r=>r.author_employee_id===state.employeeId)?.reaction_type || '';
+}
+function setOwnConversationReaction(message,type) {
+  message.reactions=(message.reactions || []).filter(r=>r.author_employee_id!==state.employeeId);
+  if(type)message.reactions.push({author_employee_id:state.employeeId,reaction_type:type});
+}
+function conversationReactionGroups(row,cell,message) {
+  return Object.entries(CONVERSATION_REACTIONS).map(([key,[icon,label]])=>{
+    const members=(message.reactions || []).filter(r=>r.reaction_type===key);
+    return {key,icon,label,count:members.length,own:members.some(r=>r.author_employee_id===state.employeeId),
+      names:members.map(r=>conversationAuthorName(row,cell,r.author_employee_id,r.author_name))};
+  }).filter(g=>g.count);
+}
+function renderConversationReactions(row,cell,message,attrs) {
+  const groups=conversationReactionGroups(row,cell,message);
+  const own=ownConversationReaction(message);
+  const canReact=message.author_employee_id!==state.employeeId && canParticipate(row,cell);
+  if(!groups.length && !canReact)return '';
+  const count=groups.reduce((n,g)=>n+g.count,0);
+  const button=(body,label,selected=false,tooltip='')=>`<button class="conversation-reaction-toggle${selected?' has-reaction is-selected':''}" type="button" data-conversation-action="reaction-menu" data-current-reaction="${own}" ${attrs} aria-label="${escapeHtml(label)}" aria-expanded="false" title="${escapeHtml(tooltip)}">${body}</button>`;
+  const number=n=>n>99?'99+':String(n);
+  const badge=(body,label)=>`<span class="conversation-reaction-badge" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">${body}</span>`;
+  const full=groups.map(g=>{
+    const body=`${g.icon}${g.count>1?`<small>${number(g.count)}</small>`:''}`;
+    const label=`${g.label}（${g.names.join('、')}）`;
+    return canReact&&g.own ? button(body,`${g.label}：自分のリアクションを変更・解除`,true,label) : badge(body,label);
+  }).join('')+(canReact&&!own?button('+','リアクションを追加'):'');
+  const icon=own ? CONVERSATION_REACTIONS[own][0] : canReact ? '+' : groups[0].icon;
+  const label=canReact ? (own?`${CONVERSATION_REACTIONS[own][1]}：自分のリアクションを変更・解除`:'リアクションを追加') : groups.map(g=>`${g.label} ${g.count}人（${g.names.join('、')}）`).join('、');
+  const body=`${icon}${count?`<small>${number(count)}</small>`:''}`;
+  const tooltip=groups.map(g=>`${g.label}（${g.names.join('、')}）`).join('\n');
+  const compact=canReact ? button(body,label,Boolean(own),tooltip) : badge(body,tooltip);
+  return `<span class="conversation-reactions"><span class="conversation-reactions-full">${full}</span><span class="conversation-reactions-compact">${compact}</span></span>`;
+}
 function renderConversationMessage(row,cell,message,rowIndex,commentIndex) {
   if (message.deleted_at) return '';
   const own=message.author_employee_id===state.employeeId;
@@ -136,21 +174,17 @@ function renderConversationMessage(row,cell,message,rowIndex,commentIndex) {
   const field=messageKey(message);
   const attrs=`data-row="${rowIndex}" data-comment="${commentIndex}" data-message="${escapeHtml(field)}"`;
   const dirty=isConversationMessageDirty(row,cell,message);
-  const authorName=message.author_employee_id===cell.superior_employee_id ? cell.superior_name : row.display_name;
+  const authorName=conversationAuthorName(row,cell,message.author_employee_id,message.author_name);
   const content=renderEditableCell({kind:'message',type:initial?'boss':'reply',field,rowIndex,commentIndex,value:message.message_text,editable,showEmptyIcon:false,dirty,editLabel:`${authorName || ''}のメッセージ`});
-  const selected=CONVERSATION_REACTIONS[message.reaction_type];
-  // Reactions belong to the other participant in this two-person conversation.
-  const reactorIsSubordinate=message.author_employee_id===cell.superior_employee_id;
-  const reactorName=reactorIsSubordinate
-    ? row.display_name || row.employee_id
-    : cell.superior_name || cell.superior_employee_id;
-  const reactionLabel=selected ? `${selected[1]}（${reactorName}）` : 'リアクションを追加';
-  const canReact=!initial && !own && !message.deleted_at && canParticipate(row,cell);
-  const reaction=canReact
-    ? `<button class="conversation-reaction-toggle${selected ? ' has-reaction' : ''}" type="button" data-conversation-action="reaction-menu" ${attrs} aria-label="${escapeHtml(selected ? reactionLabel+'：変更・解除' : reactionLabel)}" aria-expanded="false" title="${escapeHtml(reactionLabel)}">${selected?.[0] || '+'}</button>`
-    : !initial && selected ? `<span class="conversation-reaction-badge" title="${escapeHtml(reactionLabel)}" aria-label="${escapeHtml(reactionLabel)}">${selected[0]}</span>` : '';
+  const superior=message.author_employee_id!==row.employee_id;
+  // The report owner (and read-only viewers) use the column's author as the
+  // reference; assigned supervisors use themselves, even in another column.
+  const referenceSupervisor=row.can_edit_my_comment && state.employeeId!==row.employee_id
+    ? state.employeeId : cell.superior_employee_id;
+  const guestSuperior=superior && message.author_employee_id!==referenceSupervisor;
+  const reaction=initial ? '' : renderConversationReactions(row,cell,message,attrs);
   const header=initial ? '' : `<div class="conversation-card-header"><span class="conversation-author" title="${escapeHtml(authorName || message.author_employee_id)}">${escapeHtml(authorName || message.author_employee_id)}</span>${reaction}</div>`;
-  return `<div class="conversation-card ${initial?'conversation-initial':'cell-frame reply-card'} ${own?'is-own':'is-partner'} ${message.author_employee_id===cell.superior_employee_id?'is-superior':'is-subordinate'} ${dirty?'is-dirty':''}" ${attrs} tabindex="0">${header}${content}</div>`;
+  return `<div class="conversation-card ${initial?'conversation-initial':'cell-frame reply-card'} ${own?'is-own':'is-partner'} ${superior?'is-superior':'is-subordinate'} ${guestSuperior?'is-guest-superior':''} ${dirty?'is-dirty':''}" ${attrs} tabindex="0">${header}${content}</div>`;
 }
 function handleConversationAction(button) {
   if(state.isBusy)return;
@@ -185,8 +219,8 @@ function handleConversationAction(button) {
   if(action==='react' && m.message_kind==='reply' && m.author_employee_id!==state.employeeId) {
     const type=button.dataset.reaction;
     if(!CONVERSATION_REACTIONS[type])return;
-    const op={...conversationBase(row,cell),action:'react',target_author_employee_id:m.author_employee_id,target_message_id:m.message_id,reaction_type:m.reaction_type===type?'':type};
-    m.reaction_type=op.reaction_type;state.conversationChanges.set(conversationDraftKey(op),op);
+    const op={...conversationBase(row,cell),action:'react',target_author_employee_id:m.author_employee_id,target_message_id:m.message_id,reaction_type:ownConversationReaction(m)===type?'':type};
+    setOwnConversationReaction(m,op.reaction_type);state.conversationChanges.set(conversationDraftKey(op),op);
   }
   renderTable({preserveScroll:true});syncChrome();
 }
@@ -203,19 +237,43 @@ function toggleConversationMenu(button) {
   const card=button.closest('.conversation-card');
   const row=state.rows[Number(button.dataset.row)],cell=row?.comments?.[Number(button.dataset.comment)];
   const m=cell?.messages?.find(m=>messageKey(m)===button.dataset.message);
-  if(!card || !m || m.message_kind!=='reply' || m.deleted_at || m.author_employee_id===state.employeeId || !canParticipate(row,cell))return;
+  if(!card || !m || m.message_kind!=='reply' || m.deleted_at)return;
+  const canReact=m.author_employee_id!==state.employeeId && canParticipate(row,cell);
+  if(!canReact || button.dataset.currentReaction!==ownConversationReaction(m))return;
   conversationMenuTrigger=button;
   const attrs=`data-row="${button.dataset.row}" data-comment="${button.dataset.comment}" data-message="${escapeHtml(button.dataset.message)}"`;
-  conversationMenu.innerHTML=Object.entries(CONVERSATION_REACTIONS).map(([key,[icon,label]])=>`<button type="button" data-conversation-action="react" data-reaction="${key}" ${attrs} aria-label="${label}" title="${label}" aria-pressed="${m.reaction_type===key}">${icon}</button>`).join('');
+  const controls=canReact ? `<div class="conversation-reaction-choices">${Object.entries(CONVERSATION_REACTIONS).map(([key,[icon,label]])=>`<button type="button" data-conversation-action="react" data-reaction="${key}" ${attrs} aria-label="${label}${ownConversationReaction(m)===key?'を解除':''}" title="${label}${ownConversationReaction(m)===key?'を解除':''}" aria-pressed="${ownConversationReaction(m)===key}">${icon}</button>`).join('')}</div>` : '';
+  conversationMenu.innerHTML=controls;
   conversationMenu.hidden=false;button.setAttribute('aria-expanded','true');
   const rect=button.getBoundingClientRect();
   conversationMenu.style.left=`${Math.max(4,Math.min(rect.right-conversationMenu.offsetWidth,innerWidth-conversationMenu.offsetWidth-4))}px`;
   const top=rect.top-conversationMenu.offsetHeight-4;
   conversationMenu.style.top=`${Math.max(4,Math.min(top>=4 ? top : rect.bottom+4,innerHeight-conversationMenu.offsetHeight-4))}px`;
-  conversationMenu.querySelector('button')?.focus({preventScroll:true});
+  (conversationMenu.querySelector('[aria-pressed="true"]') || conversationMenu.querySelector('button')).focus({preventScroll:true});
+}
+function fitConversationReactionHeader(header) {
+  const full=header.querySelector('.conversation-reactions-full');
+  if(!full)return;
+  const card=header.parentElement, style=getComputedStyle(card);
+  const width=card.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
+  header.classList.toggle('is-compact',full.scrollWidth+28>width);
+  header.classList.toggle('is-tiny',width<36);
+}
+function observeConversationReactionHeaders() {
+  const headers=new Set();
+  const resize=new ResizeObserver(entries=>entries.forEach(e=>fitConversationReactionHeader(e.target)));
+  const refresh=()=>{
+    for(const header of headers)if(!header.isConnected){resize.unobserve(header);headers.delete(header);}
+    document.querySelectorAll('.conversation-card-header').forEach(header=>{
+      if(!headers.has(header)){headers.add(header);fitConversationReactionHeader(header);resize.observe(header);}
+    });
+  };
+  new MutationObserver(refresh).observe(document.getElementById('reportPanel'),{childList:true,subtree:true});
+  refresh();
 }
 function setupConversationUi() {
-  conversationMenu=document.createElement('div');conversationMenu.className='conversation-float-menu';conversationMenu.hidden=true;conversationMenu.setAttribute('role','group');conversationMenu.setAttribute('aria-label','リアクション');document.body.append(conversationMenu);
+  observeConversationReactionHeaders();
+  conversationMenu=document.createElement('div');conversationMenu.className='conversation-float-menu';conversationMenu.hidden=true;conversationMenu.tabIndex=-1;conversationMenu.setAttribute('role','group');conversationMenu.setAttribute('aria-label','リアクション');document.body.append(conversationMenu);
   conversationMenu.addEventListener('click',event=>{const button=event.target.closest('button');if(button)handleConversationAction(button);});
   document.addEventListener('pointerdown',event=>{
     if(!conversationMenu.contains(event.target) && !event.target.closest('.conversation-reaction-toggle'))hideConversationMenu();

@@ -1,8 +1,8 @@
-"""最初期のCSV（replies JSON/5列コメント）を現行v4へ変換する。
+"""最初期のCSV（replies JSON/5列コメント）を現行v5へ変換する。
 
 元データとsettings/storage.iniは変更しない。--writeなしは事前検証のみ。
 Python 3.10以降の標準ライブラリだけで実行できます（追加インストール不要）。
-python convert_csv.py --source test_data --output converted_v4 --write
+python convert_csv.py --source test_data --output converted_v5 --write
 """
 from __future__ import annotations
 
@@ -19,16 +19,16 @@ from pathlib import Path, PureWindowsPath
 from uuid import UUID, uuid4
 from typing import Any
 
-# Frozen v4 migration contract. Keep this file standalone: no app/tools imports.
+# v1-to-v5 migration contract. Keep this file standalone: no app/tools imports.
 # Compatibility is checked against the application by tests/test_csv_v1_to_v4.py.
 MAX_EMPLOYEE_ID_LENGTH = 128
 _INVALID_WINDOWS_FILENAME_CHARS = set('<>:"/\\|?*')
 
-FIELDS = ['message_id','message_kind','message_text','message_rich_text','target_author_employee_id','target_message_id','reaction_type','created_at','updated_at','deleted_at']
+FIELDS = ['author_employee_id','message_id','message_kind','message_text','message_rich_text','target_author_employee_id','target_message_id','reaction_type','created_at','updated_at','deleted_at']
 USER_COLUMNS = ['record_type','employee_id','date','business_name','business_name_rich_text','business_detail','business_detail_rich_text','superior_employee_id',*FIELDS]
 COMMENT_COLUMNS = ['record_type','superior_employee_id','subordinate_employee_id','date',*FIELDS]
-USER_KEYS = ['record_type','employee_id','date','superior_employee_id','message_id','target_author_employee_id','target_message_id']
-COMMENT_KEYS = ['record_type','superior_employee_id','subordinate_employee_id','date','message_id','target_author_employee_id','target_message_id']
+USER_KEYS = ['author_employee_id','record_type','employee_id','date','superior_employee_id','message_id','target_author_employee_id','target_message_id']
+COMMENT_KEYS = ['author_employee_id','record_type','superior_employee_id','subordinate_employee_id','date','message_id','target_author_employee_id','target_message_id']
 
 
 MAX_TEXT_LENGTH = 20_000
@@ -234,7 +234,7 @@ def thread(row, side):
     return (row['employee_id'] if side=='user' else row['subordinate_employee_id'],row['date'],row['superior_employee_id'])
 
 def author(row,side):
-    return row['employee_id'] if side=='user' else row['superior_employee_id']
+    return row['employee_id'] if row['record_type']=='report' and side=='user' else row['author_employee_id']
 
 def validate_rows(rows, owner, side):
     columns=USER_COLUMNS if side=='user' else COMMENT_COLUMNS
@@ -347,7 +347,7 @@ def convert(source: Path, output: Path, *, write=False):
 
     def message(row, text, kind, timestamp):
         rich, plain = serialize(from_plain(text))
-        row.update(record_type='message', message_id=str(uuid4()), message_kind=kind,
+        row.update(record_type='message', author_employee_id=row.get('employee_id') or row['superior_employee_id'], message_id=str(uuid4()), message_kind=kind,
                    message_text=plain, message_rich_text=rich,
                    created_at=timestamp, updated_at=timestamp)
 
@@ -401,14 +401,14 @@ def convert(source: Path, output: Path, *, write=False):
         warnings.append('空のupdated_atは日報対象日の日本時間00:00で補完しました。')
     if replies - initials:
         warnings.append(f'初回上司コメントのない返信が{len(replies - initials)}会話あります。返信を保持し、初回コメントは生成しません。')
-    result = dict(source_version=1, target_version=4, written=write, source=str(source),
+    result = dict(source_version=1, target_version=5, written=write, source=str(source),
                   output=str(output), counts=counts, warnings=warnings,
                   timestamp_policy='旧updated_atを作成・更新日時に使用。タイムゾーンなしは日本時間。元の投稿日時の復元ではありません。',
                   source_sha256=hashes)
     if snapshot(source) != hashes:
         raise ValueError('検証中に変換元CSVが変更されました。')
     if write:
-        with tempfile.TemporaryDirectory(prefix='.csv-v1-v4-', dir=output.parent) as temporary:
+        with tempfile.TemporaryDirectory(prefix='.csv-v1-v5-', dir=output.parent) as temporary:
             staged = Path(temporary) / 'data'
             for folder in (*REPORT_DIRECTORIES, 'supervisor_comments', 'common_data'):
                 (staged / folder).mkdir(parents=True)
@@ -423,7 +423,7 @@ def convert(source: Path, output: Path, *, write=False):
                     raise ValueError('コピー中に管理CSVが変更されました。')
             if snapshot(source) != hashes:
                 raise ValueError('出力中に変換元CSVが変更されました。')
-            (staged / 'migration-v1-to-v4.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+            (staged / 'migration-v1-to-v5.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
             # Same-volume rename publishes only a fully prepared output. Never replace existing data.
             if output.exists():
                 raise ValueError('出力先が既に存在します。')
