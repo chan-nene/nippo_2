@@ -4,6 +4,7 @@ import getpass
 import json
 import logging
 import os
+import sys
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
@@ -88,6 +89,7 @@ class DailyReportApi:
         return {"ok": True}
 
     def get_initial_state(self) -> dict[str, Any]:
+        developer_users = []
         employee_registered: bool | None = None
         is_admin = False
         settings_context = self._default_settings_context()
@@ -99,6 +101,15 @@ class DailyReportApi:
                 common = self._get_data_cache().read_startup_common(
                     self._settings, self._employee_id
                 )
+                if not getattr(sys, "frozen", False):
+                    developer_users = [
+                        {"employee_id": str(row.get("employee_id", "")),
+                         "display_name": row.get("display_name", ""),
+                         "is_admin": self._user_is_admin(row)}
+                        for row in common.get("user_master", []) if row.get("employee_id")
+                    ]
+                    if not self._employee_id and developer_users:
+                        self._employee_id = developer_users[0]["employee_id"]
                 current_user = next((row for row in common.get("user_master", [])
                                      if str(row.get("employee_id", "")).strip() == self._employee_id), None)
                 employee_registered = current_user is not None
@@ -112,6 +123,8 @@ class DailyReportApi:
         if employee_registered is False:
             is_admin = False
         return {
+            "developer_mode": not getattr(sys, "frozen", False),
+            "developer_users": developer_users,
             "employee_id": self._employee_id,
             "is_admin": is_admin,
             "calendar_min_fiscal_year": CALENDAR_MIN_FISCAL_YEAR,
@@ -142,6 +155,29 @@ class DailyReportApi:
             "settings_context": settings_context,
             **settings_context,
         }
+
+    def switch_developer_user(self, employee_id: str) -> dict[str, Any]:
+        if getattr(sys, "frozen", False):
+            return {"ok": False, "message": "配布版ではユーザーを切り替えられません。"}
+        if self.has_unsaved_changes:
+            return {"ok": False, "message": "未保存の変更を確認してください。"}
+        try:
+            settings = self._settings_manager.load()
+            settings.root_path = self._storage_manager.load()
+            repository = DailyReportRepository(settings, self._base_dir)
+            common = repository.load_common()
+            if not isinstance(employee_id, str) or not any(
+                row.get("employee_id") == employee_id for row in common.get("user_master", [])
+            ):
+                return {"ok": False, "message": "管理データに存在しないユーザーです。"}
+            self._settings = settings
+            self._storage_error = None
+            self._employee_id = employee_id
+            self._data_cache = DailyReportDataCache(self._base_dir)
+            return {"ok": True}
+        except Exception:
+            logger.exception("Failed to switch development user")
+            return {"ok": False, "message": "ユーザーを切り替えられませんでした。"}
 
     def load_settings(self) -> dict[str, Any]:
         with self._settings_manager.lock:
@@ -938,27 +974,8 @@ class DailyReportApi:
         )
 
     def _get_employee_id(self) -> str:
-        import sys
-
-        # 開発中の場合、デバッグユーザーを選択させる
         if not getattr(sys, "frozen", False):
-            try:
-                import tkinter as tk
-                from tkinter import simpledialog
-
-                root = tk.Tk()
-                root.withdraw()
-                root.attributes("-topmost", True)
-                debug_user = simpledialog.askstring(
-                    "開発用ログイン",
-                    "ユーザーIDを入力してください\n※キャンセル・空白でOSユーザー",
-                    parent=root,
-                )
-                root.destroy()
-                if debug_user and debug_user.strip():
-                    return debug_user.strip()
-            except Exception as e:
-                print(f"Failed to show debug login: {e}")
+            return ""
 
         for getter in (getpass.getuser, lambda: os.environ.get("USERNAME", "")):
             try:

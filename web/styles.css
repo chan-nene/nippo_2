@@ -1113,11 +1113,10 @@ html body .font-size-menu {
   padding: 6px;
 }
 
-html body .font-size-options {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
-}
+html body .font-size-adjustment { padding: 8px 10px; }
+html body .font-size-heading { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+html body #fontSizeSlider { display: block; width: 100%; margin: 14px 0 6px; padding: 0; accent-color: var(--primary); cursor: pointer; }
+html body .font-size-preview { display: flex; flex-direction: column; justify-content: center; gap: 4px; height: 72px; margin-top: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-hover); font-size: var(--ui-font-size); line-height: 1.5; }
 
 html body .font-size-menu-divider {
   height: 1px;
@@ -1708,3 +1707,7 @@ html body .sidebar-version {
   font-size: var(--font-11);
   line-height: 1.5;
 }
+
+.developer-user-control { display: flex; align-items: center; gap: 8px; margin-inline: 16px; min-width: 0; font-size: 12px; }
+.developer-user-control.hidden { display: none; }
+.developer-user-control select { max-width: 240px; min-width: 100px; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; }

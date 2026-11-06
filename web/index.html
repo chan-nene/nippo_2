@@ -28,6 +28,10 @@
           <span class="title-bar-title">NIPPO</span>
         </div>
       </div>
+      <label id="developerUserControl" class="developer-user-control hidden">
+        <span>開発者モード</span>
+        <select id="developerUserSelect" aria-label="デバッグ対象ユーザー"></select>
+      </label>
       <div class="title-bar-actions" aria-label="アプリ操作">
         <div id="fontSizeControl" class="font-size-control">
           <button
@@ -50,12 +54,16 @@
             role="group"
             aria-label="表示調整"
           >
-            <div class="font-size-options">
-              <button type="button" data-font-size="compact" aria-pressed="false">極小</button>
-              <button type="button" data-font-size="standard" aria-pressed="true">小</button>
-              <button type="button" data-font-size="medium" aria-pressed="false">中</button>
-              <button type="button" data-font-size="large" aria-pressed="false">大</button>
-              <button type="button" data-font-size="xlarge" aria-pressed="false">極大</button>
+            <div class="font-size-adjustment">
+              <div class="font-size-heading">
+                <label for="fontSizeSlider">文字サイズ</label>
+                <output id="fontSizeValue" for="fontSizeSlider">12px</output>
+              </div>
+              <input id="fontSizeSlider" type="range" min="0" max="4" step="1" value="1" aria-valuetext="12ピクセル" />
+              <div class="font-size-preview" aria-label="文字サイズのサンプル">
+                <span>日報の文字サイズを確認</span>
+                <span>あいうえお ABC 123</span>
+              </div>
             </div>
             <div class="font-size-menu-divider" aria-hidden="true"></div>
             <button id="fitColumnWidthsButton" class="font-size-menu-reset" type="button">

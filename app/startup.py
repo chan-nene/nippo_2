@@ -91,6 +91,9 @@ class DeferredApi:
     def get_initial_state(self):
         return self._get_api().get_initial_state()
 
+    def switch_developer_user(self, employee_id):
+        return self._get_api().switch_developer_user(employee_id)
+
     def close_window(self):
         if self._close_callback is None:
             return {"ok": False}

@@ -1560,7 +1560,7 @@ html body #reportPanel .table-scroll {
   overflow: auto;
   border: 0;
   border-bottom: 0;
-  border-radius: 0;
+  border-radius: 4px;
   isolation: isolate;
 }
 
@@ -2452,22 +2452,18 @@ html body .conversation-card-header.is-tiny :is(.conversation-reaction-toggle, .
   background: var(--table-cell-bg); border-radius: 2px;
 }
 
-/* Reference-supervisor replies are neutral; other supervisors are pale yellow. */
-html body #reportPanel .conversation-card.reply-card.is-superior {
-  --superior-reply-bg: color-mix(in srgb, var(--table-cell-bg) 94%, var(--text) 6%);
-  background-color: var(--superior-reply-bg);
-  border-color: color-mix(in srgb, var(--superior-reply-bg) 92%, #000 8%);
+/* Reply colors depend only on the viewer, independently of role or column. */
+html body #reportPanel .conversation-card.reply-card.is-own {
+  --own-reply-bg: color-mix(in srgb, var(--table-cell-bg) 94%, var(--text) 6%);
+  background-color: var(--own-reply-bg);
+  border-color: color-mix(in srgb, var(--own-reply-bg) 92%, #000 8%);
   color: var(--text);
 }
-html body #reportPanel .conversation-card.reply-card.is-guest-superior {
-  --superior-reply-bg: color-mix(in srgb, var(--table-cell-bg) 90%, #e7bd45 10%);
-  color: #865b32;
+html body #reportPanel .conversation-card.reply-card.is-own:has(.reply-content.is-editable):not(:has(.is-editing)):hover {
+  background-color: color-mix(in srgb, var(--own-reply-bg) 82%, var(--text));
 }
-html body #reportPanel .conversation-card:is(.is-guest-superior, .is-subordinate) .conversation-author {
+html body #reportPanel .conversation-card.reply-card.is-partner .conversation-author {
   color: inherit;
-}
-html[data-theme="dark"] body #reportPanel .conversation-card.reply-card.is-guest-superior {
-  color: #d6b28b;
 }
 html body .comment-stack:has(> .conversation-initial .boss-content.is-editing) > .boss-comment-actions {
   opacity: 0;

@@ -423,9 +423,15 @@ function bindEvents() {
     void reloadCurrentView();
   });
   $("fontSizeButton").addEventListener("click", toggleFontSizeMenu);
-  $("fontSizeMenu").addEventListener("click", (event) => {
-    const button = event.target.closest("[data-font-size]");
-    if (button) setFontSize(button.dataset.fontSize);
+  $("fontSizeSlider").addEventListener("input", (event) => {
+    setFontSize(FONT_SIZE_STEPS[Number(event.target.value)].value);
+  });
+  $("fontSizeSlider").addEventListener("change", persistUiState);
+  $("fontSizeControl").addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeFontSizeMenu();
+      $("fontSizeButton").focus();
+    }
   });
   initializeColorThemeControl();
   initializeFlatpickrDateInputs();
@@ -744,24 +750,28 @@ function closeFontSizeMenu() {
   $("fontSizeButton").setAttribute("aria-expanded", "false");
 }
 
+const FONT_SIZE_STEPS = [
+  {value: "compact", pixels: 11},
+  {value: "standard", pixels: 12},
+  {value: "medium", pixels: 13},
+  {value: "large", pixels: 14},
+  {value: "xlarge", pixels: 15},
+];
+
 function setFontSize(fontSize) {
-  if (!["compact", "standard", "medium", "large", "xlarge"].includes(fontSize)) return;
+  if (!FONT_SIZE_STEPS.some(step => step.value === fontSize)) return;
   state.fontSize = fontSize;
   applyFontSize();
-  closeFontSizeMenu();
-  persistUiState();
 }
 
 function applyFontSize() {
   document.body.dataset.fontSize = state.fontSize;
   $("fontSizeButton").classList.remove("is-active");
-  $("fontSizeMenu")
-    .querySelectorAll("[data-font-size]")
-    .forEach((button) => {
-      const isActive = button.dataset.fontSize === state.fontSize;
-      button.classList.toggle("is-active", isActive);
-      button.setAttribute("aria-pressed", String(isActive));
-  });
+  const index = FONT_SIZE_STEPS.findIndex(step => step.value === state.fontSize);
+  const step = FONT_SIZE_STEPS[index >= 0 ? index : 1];
+  $("fontSizeSlider").value = String(index >= 0 ? index : 1);
+  $("fontSizeSlider").setAttribute("aria-valuetext", `${step.pixels}ピクセル`);
+  $("fontSizeValue").textContent = `${step.pixels}px`;
   applyColumnWidthsToRenderedTable();
   positionToast();
 }
@@ -1552,6 +1562,7 @@ window.addEventListener("pywebviewready", async () => {
     );
     return;
   }
+  setupDeveloperUserControl(initial);
   startupDialog?.close();
   state.employeeId = initial.employee_id || "";
   state.isAdmin = initial.is_admin === true;
@@ -1581,3 +1592,45 @@ window.addEventListener("pywebviewready", async () => {
   }
   await loadData({ forceRefresh: true });
 });
+
+function setupDeveloperUserControl(initial) {
+  const control = $("developerUserControl"), select = $("developerUserSelect");
+  control.classList.toggle("hidden", !initial.developer_mode);
+  if (!initial.developer_mode) return;
+  select.replaceChildren(...(initial.developer_users || []).map(user => {
+    const option = document.createElement("option");
+    option.value = user.employee_id;
+    option.textContent = `${user.display_name || user.employee_id} (${user.employee_id})${user.is_admin ? " 管理者" : ""}`;
+    return option;
+  }));
+  select.value = initial.employee_id || "";
+  select.disabled = !select.options.length;
+  select.addEventListener("change", async () => {
+    const requested = select.value;
+    select.value = state.employeeId;
+    if (state.isBusy) return;
+    finishEditing();
+    if (hasUnsavedChanges() && !(await requestConfirmationDialog({
+      title: "未保存の変更があります",
+      description: "ユーザーを切り替えると、保存していない変更は失われます。",
+      confirmLabel: "破棄してユーザーを切り替え", cancelLabel: "このまま編集を続ける",
+      confirmTone: "danger",
+    }))) return;
+    if (state.isBusy) return;
+    select.disabled = true;
+    setBusy(true, "load");
+    try {
+      await uiStateSaveQueue;
+      await window.pywebview.api.set_unsaved_changes(false);
+      const result = await window.pywebview.api.switch_developer_user(requested);
+      if (!result.ok) throw new Error(result.message);
+      state.closeApproved = true;
+      window.location.reload();
+    } catch (error) {
+      await window.pywebview.api.set_unsaved_changes(hasUnsavedChanges());
+      notify({text: error.message || "ユーザーを切り替えられませんでした。", type: "error"});
+      select.disabled = false;
+      setBusy(false);
+    }
+  });
+}

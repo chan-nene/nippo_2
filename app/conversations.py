@@ -15,7 +15,7 @@ USER_KEYS = ['author_employee_id','record_type','employee_id','date','superior_e
 COMMENT_KEYS = ['author_employee_id','record_type','superior_employee_id','subordinate_employee_id','date','message_id','target_author_employee_id','target_message_id']
 VIEW_USERS = ['record_type','employee_id','date','business_name','business_name_rich_text','business_detail','business_detail_rich_text','reply_to_employee_id','reply_text','reply_rich_text','updated_at']
 VIEW_COMMENTS = ['superior_employee_id','subordinate_employee_id','date','comment','comment_rich_text','updated_at']
-REACTIONS = {'like','understood','cry','bow'}
+REACTIONS = {'like','understood','cry','bow','surprised','thanks'}
 
 def frame(rows, columns):
     return Table([{k:str(r.get(k,'') or '') for k in columns} for r in rows], columns)

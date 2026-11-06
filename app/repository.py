@@ -10,10 +10,9 @@ import os
 import shutil
 import stat
 import tempfile
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from app.sqlite_table import Table, concat, read_csv, quote
 from app.rich_text import RICH_FIELDS, EMPTY_RICH_TEXT, serialize as serialize_rich_text
@@ -32,7 +31,7 @@ from app.security import (
 
 logger = logging.getLogger(__name__)
 
-JST = ZoneInfo("Asia/Tokyo")
+JST = timezone(timedelta(hours=9), "JST")
 
 USER_COLUMNS = conversation.USER_COLUMNS
 USER_KEYS = conversation.USER_KEYS
@@ -1405,9 +1404,6 @@ class DailyReportRepository:
         global_order: list[str] | None = None,
         target_commenters: dict[str, list[str]] | None = None,
     ) -> tuple[list[dict[str, Any]] | Table, date | None, date | None]:
-        conversations = conversation.conversation_index(users_df, comments_df)
-        users_df = conversation.project_users(users_df)
-        comments_df = conversation.project_comments(comments_df)
         failed_comment_ids = {
             str(item).strip()
             for item in (failed_comment_superior_ids or set())
@@ -1449,7 +1445,14 @@ class DailyReportRepository:
         if default_start > default_end:
             default_start, default_end = default_end, default_start
 
-        visible_source = users_df.where("date BETWEEN ? AND ?", (default_start.isoformat(), default_end.isoformat()))
+        # Scope by the report/thread date, not the posting timestamp: later
+        # replies and reactions still belong to the displayed day's conversation.
+        date_range = (default_start.isoformat(), default_end.isoformat())
+        visible_users = users_df.where("date BETWEEN ? AND ?", date_range)
+        visible_comments = comments_df.where("date BETWEEN ? AND ?", date_range)
+        conversations = conversation.conversation_index(visible_users, visible_comments)
+        visible_source = conversation.project_users(visible_users)
+        comments_df = conversation.project_comments(visible_comments)
         original_targets = list(dict.fromkeys(eid for eid in target_employee_ids if eid))
         # Failed partitions retain old rows but must not synthesize editable blanks.
         target_ids = list(dict.fromkeys([*original_targets, *visible_source.column_values("employee_id")]))

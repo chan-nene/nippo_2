@@ -1,5 +1,5 @@
 // Author-owned conversation drafts and message/reaction presentation.
-const CONVERSATION_REACTIONS = {like:['👍','いいね'],understood:['🫡','了解'],cry:['😢','悲しい'],bow:['🙇','ありがとう']};
+const CONVERSATION_REACTIONS = {like:['👍','いいね'],surprised:['😲','驚く'],cry:['😢','悲しい'],understood:['🫡','了解'],thanks:['🙏','ありがとう'],bow:['🙇','おじぎ']};
 function messageKey(message) { return `${message.author_employee_id}|${message.message_id}`; }
 function conversationDraftKey(op) {
   return `${op.subordinate_employee_id}|${op.date}|${op.superior_employee_id}|${op.action==='react' ? `reaction|${op.target_author_employee_id}|${op.target_message_id}` : `message|${op.message_id}`}`;
@@ -111,6 +111,9 @@ function commitSavedConversationOperation(op) {
   syncConversationInitial(cell);
 }
 function renderConversationCell(row,cell,rowIndex,commentIndex) {
+  return `<td class="comment-col" data-row="${rowIndex}" data-comment="${commentIndex}">${renderConversationStack(row,cell,rowIndex,commentIndex)}</td>`;
+}
+function renderConversationStack(row,cell,rowIndex,commentIndex) {
   const messages=cell.messages ||= [];
   let initial=messages.find(m=>m.message_kind==='initial_comment' && !m.deleted_at);
   if(!initial && cell.editable) { initial=newConversationMessage('initial_comment');messages.unshift(initial); }
@@ -121,7 +124,25 @@ function renderConversationCell(row,cell,rowIndex,commentIndex) {
   const replies=messages.filter(m=>m.message_kind==='reply').map(m=>renderConversationMessage(row,cell,m,rowIndex,commentIndex)).join('');
   const add=canAppendConversationReply(cell) && canParticipate(row,cell)
     ? `<div class="reply-section is-collapsed">${renderReplyToggleButtonMarkup(rowIndex,commentIndex).replace('data-action="toggle-reply"','data-conversation-action="reply"')}</div>` : '';
-  return `<td class="comment-col"><div class="comment-stack">${sign}${initialHtml}${replies}${add}</div></td>`;
+  return `<div class="comment-stack">${sign}${initialHtml}${replies}${add}</div>`;
+}
+// Keep the table, loaded batches and unrelated cells intact during local actions.
+// Reaction buttons live in a floating menu, so locate their card by its identity.
+function updateConversationCell(rowIndex,commentIndex,message=null) {
+  const row=state.rows[rowIndex],cell=row?.comments?.[commentIndex];
+  const target=document.querySelector(`#tableWrap td.comment-col[data-row="${rowIndex}"][data-comment="${commentIndex}"]`);
+  if(!cell || !target)return null;
+  const card=message ? Array.from(target.querySelectorAll('.conversation-card')).find(el=>el.dataset.message===messageKey(message)) : null;
+  if(message && !card)return null;
+  const scroll=target.closest('.table-scroll');
+  const scrollTop=scroll?.scrollTop,scrollLeft=scroll?.scrollLeft;
+  if(card)card.outerHTML=renderConversationMessage(row,cell,message,rowIndex,commentIndex);
+  else target.innerHTML=renderConversationStack(row,cell,rowIndex,commentIndex);
+  const tableRow=target.closest('tr');
+  tableRow?.classList.toggle('has-boss-comment',rowHasVisibleBossComment(row));
+  tableRow?.classList.toggle('needs-boss-comment',rowNeedsBossComment(row));
+  if(scroll) {scroll.scrollTop=scrollTop;scroll.scrollLeft=scrollLeft;}
+  return target;
 }
 function isConversationMessageDirty(row,cell,message) {
   const edit=messageOperation(row,cell,message,message.is_new?'create':'edit');
@@ -176,15 +197,9 @@ function renderConversationMessage(row,cell,message,rowIndex,commentIndex) {
   const dirty=isConversationMessageDirty(row,cell,message);
   const authorName=conversationAuthorName(row,cell,message.author_employee_id,message.author_name);
   const content=renderEditableCell({kind:'message',type:initial?'boss':'reply',field,rowIndex,commentIndex,value:message.message_text,editable,showEmptyIcon:false,dirty,editLabel:`${authorName || ''}のメッセージ`});
-  const superior=message.author_employee_id!==row.employee_id;
-  // The report owner (and read-only viewers) use the column's author as the
-  // reference; assigned supervisors use themselves, even in another column.
-  const referenceSupervisor=row.can_edit_my_comment && state.employeeId!==row.employee_id
-    ? state.employeeId : cell.superior_employee_id;
-  const guestSuperior=superior && message.author_employee_id!==referenceSupervisor;
   const reaction=initial ? '' : renderConversationReactions(row,cell,message,attrs);
   const header=initial ? '' : `<div class="conversation-card-header"><span class="conversation-author" title="${escapeHtml(authorName || message.author_employee_id)}">${escapeHtml(authorName || message.author_employee_id)}</span>${reaction}</div>`;
-  return `<div class="conversation-card ${initial?'conversation-initial':'cell-frame reply-card'} ${own?'is-own':'is-partner'} ${superior?'is-superior':'is-subordinate'} ${guestSuperior?'is-guest-superior':''} ${dirty?'is-dirty':''}" ${attrs} tabindex="0">${header}${content}</div>`;
+  return `<div class="conversation-card ${initial?'conversation-initial':'cell-frame reply-card'} ${own?'is-own':'is-partner'} ${dirty?'is-dirty':''}" ${attrs} tabindex="0">${header}${content}</div>`;
 }
 function handleConversationAction(button) {
   if(state.isBusy)return;
@@ -207,9 +222,9 @@ function handleConversationAction(button) {
       m=(cell.messages || []).find(m=>m.message_kind==='reply' && m.is_new && !m.message_text.trim());
       if(!m){m=newConversationMessage('reply');(cell.messages ||= []).push(m);}
     }
-    renderTable({preserveScroll:true});syncChrome();
+    const targetCell=updateConversationCell(ri,ci);syncChrome();
     if(action==='reply') {
-      const target=Array.from(document.querySelectorAll('.editable-content[data-kind="message"]')).find(el=>el.dataset.row===String(ri) && el.dataset.comment===String(ci) && el.dataset.field===messageKey(m));
+      const target=Array.from(targetCell?.querySelectorAll('.editable-content[data-kind="message"]') || []).find(el=>el.dataset.field===messageKey(m));
       if(target)startEditingTarget(target,{preventScroll:true});
     }
     return;
@@ -222,7 +237,7 @@ function handleConversationAction(button) {
     const op={...conversationBase(row,cell),action:'react',target_author_employee_id:m.author_employee_id,target_message_id:m.message_id,reaction_type:ownConversationReaction(m)===type?'':type};
     setOwnConversationReaction(m,op.reaction_type);state.conversationChanges.set(conversationDraftKey(op),op);
   }
-  renderTable({preserveScroll:true});syncChrome();
+  updateConversationCell(ri,ci,m);syncChrome();
 }
 let conversationMenu=null, conversationMenuTrigger=null;
 function hideConversationMenu() {
