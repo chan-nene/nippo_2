@@ -370,6 +370,7 @@ function initializeColorThemeControl() {
 }
 
 function bindEvents() {
+  setupWindowControls();
   $("saveSettingsButton").addEventListener("click", saveSettings);
   $("settingsPanel").addEventListener("input", syncSettingsDirtyState);
   $("settingsPanel").addEventListener("change", syncSettingsDirtyState);
@@ -1541,7 +1542,12 @@ function escapeHtml(value) {
 }
 
 const startupDialog = document.getElementById("startupDialog");
-startupDialog?.showModal();
+const startupBlockedElements = document.querySelectorAll(".app-shell, .title-bar-actions, #developerUserControl");
+startupBlockedElements.forEach(element => { element.inert = true; });
+startupDialog?.addEventListener("close", () => {
+  startupBlockedElements.forEach(element => { element.inert = false; });
+});
+startupDialog?.show();
 startupDialog?.addEventListener("cancel", (event) => event.preventDefault());
 
 window.addEventListener("pywebviewready", async () => {
@@ -1633,4 +1639,81 @@ function setupDeveloperUserControl(initial) {
       setBusy(false);
     }
   });
+}
+
+async function runWindowAction(action, drag = null) {
+  const api = window.pywebview?.api;
+  if (!api?.window_action) return;
+  try {
+    const result = await api.window_action(action, drag);
+    if (!result?.ok) return;
+    const button = $("windowMaximize");
+    const label = result.maximized ? "元に戻す" : "最大化";
+    button.querySelector("path").setAttribute("d", result.maximized
+      ? "M3.5 3.5v-2h7v7h-2 M1.5 3.5h7v7h-7z"
+      : "M1.5 1.5h9v9h-9z");
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    document.body.classList.toggle("window-maximized", result.maximized);
+  } catch (error) { console.error("ウィンドウ操作に失敗しました。", error); }
+}
+function setupWindowControls() {
+  $("windowMinimize").addEventListener("click", () => void runWindowAction("minimize"));
+  $("windowMaximize").addEventListener("click", () => void runWindowAction("maximize"));
+  $("windowClose").addEventListener("click", () => { finishEditing(); requestNativeCloseConfirmation(); });
+  const bar = document.querySelector(".title-bar");
+  const isDragTarget = target => !target.closest("button, input, select, label, .font-size-menu, .window-controls");
+  let gesture = null;
+  let pendingDrag = null;
+  let dragRunning = false;
+  const queueDrag = async sample => {
+    pendingDrag = sample;
+    if (dragRunning) return;
+    dragRunning = true;
+    try {
+      while (pendingDrag) {
+        const next = pendingDrag;
+        pendingDrag = null;
+        await runWindowAction("move", next);
+      }
+    } finally { dragRunning = false; }
+  };
+  bar.addEventListener("dblclick", event => {
+    if (event.button === 0 && isDragTarget(event.target)) void runWindowAction("maximize");
+  });
+  bar.addEventListener("pointerdown", event => {
+    if (event.button !== 0 || !isDragTarget(event.target)) return;
+    gesture = { id: crypto.randomUUID(), pointerId: event.pointerId,
+      x: event.screenX, y: event.screenY,
+      fraction: event.clientX / window.innerWidth, dragging: false };
+    bar.setPointerCapture(event.pointerId);
+  });
+  const updateDrag = event => {
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    const dx = event.screenX - gesture.x, dy = event.screenY - gesture.y;
+    if (!gesture.dragging && Math.hypot(dx, dy) < 4) return;
+    gesture.dragging = true;
+    void queueDrag({ id: gesture.id, dx, dy, fraction: gesture.fraction });
+  };
+  bar.addEventListener("pointermove", updateDrag);
+  bar.addEventListener("pointerup", event => {
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    updateDrag(event);
+    gesture = null;
+    bar.releasePointerCapture(event.pointerId);
+  });
+  bar.addEventListener("lostpointercapture", () => { gesture = null; });
+  for (const direction of ["left", "right", "top", "bottom", "top-left", "top-right", "bottom-left", "bottom-right"]) {
+    const grip = document.createElement("div");
+    grip.className = `window-resize window-resize-${direction}`;
+    grip.setAttribute("aria-hidden", "true");
+    grip.addEventListener("mousedown", event => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      void runWindowAction(direction);
+    });
+    document.body.append(grip);
+  }
+  window.addEventListener("resize", () => void runWindowAction("state"));
+  void runWindowAction("state");
 }

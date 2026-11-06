@@ -42,6 +42,15 @@ class DeferredApi:
         self._error = None
         self._closed = False
         self._close_callback = None
+        self._window_action_callback = None
+
+    def _set_window_action_callback(self, callback):
+        self._window_action_callback = callback
+
+    def window_action(self, action, drag=None):
+        if self._closed or self._window_action_callback is None:
+            return {"ok": False}
+        return self._window_action_callback(action, drag)
 
     def _mark_shown(self):
         self._shown.set()

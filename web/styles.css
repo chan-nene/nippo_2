@@ -730,7 +730,8 @@ html body .title-bar {
   flex: 0 0 var(--title-height);
   align-items: center;
   justify-content: space-between;
-  padding: 0 18px 0 20px;
+  padding: 0 0 0 20px;
+  user-select: none;
 
   color: var(--text);
 }
@@ -1103,7 +1104,7 @@ html body .font-size-menu {
   z-index: 80;
   top: calc(100% + 8px);
   right: 0;
-  width: 300px;
+  width: 232px;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border-strong);
@@ -1115,7 +1116,14 @@ html body .font-size-menu {
 
 html body .font-size-adjustment { padding: 8px 10px; }
 html body .font-size-heading { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
-html body #fontSizeSlider { display: block; width: 100%; margin: 14px 0 6px; padding: 0; accent-color: var(--primary); cursor: pointer; }
+html body .font-size-slider { position: relative; height: 24px; margin: 10px 0 4px; }
+html body .font-size-slider::before { content: ""; position: absolute; left: 7px; right: 7px; top: 11px; height: 2px; border-radius: 1px; background: var(--border); }
+html body .font-size-slider-stops { position: absolute; inset: 0 5px; display: flex; align-items: center; justify-content: space-between; pointer-events: none; }
+html body .font-size-slider-stops span { width: 4px; height: 4px; border-radius: 50%; background: var(--text-muted); opacity: .5; }
+html body #fontSizeSlider { position: relative; display: block; appearance: none; width: 100%; height: 24px; margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; }
+html body #fontSizeSlider::-webkit-slider-runnable-track { height: 24px; background: transparent; }
+html body #fontSizeSlider::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; margin-top: 5px; border: 0; border-radius: 50%; background: var(--primary); }
+html body #fontSizeSlider:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
 html body .font-size-preview { display: flex; flex-direction: column; justify-content: center; gap: 4px; height: 72px; margin-top: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-hover); font-size: var(--ui-font-size); line-height: 1.5; }
 
 html body .font-size-menu-divider {
@@ -1125,11 +1133,16 @@ html body .font-size-menu-divider {
 }
 
 html body .font-size-menu .font-size-menu-reset {
+  align-items: center;
+  gap: 8px;
   width: 100%;
   justify-content: flex-start;
   padding: 0 10px;
   text-align: left;
 }
+
+html body .font-size-menu-reset:not([hidden]) { display: flex; }
+html body .font-size-menu-reset svg { flex-shrink: 0; }
 
 html body .font-size-menu.hidden {
   display: none;
@@ -1143,7 +1156,7 @@ html body .font-size-menu button {
   color: var(--text);
   padding: 0 4px;
   font-size: var(--font-13);
-  font-weight: 600;
+  font-weight: 400;
   white-space: nowrap;
 }
 
@@ -1711,3 +1724,21 @@ html body .sidebar-version {
 .developer-user-control { display: flex; align-items: center; gap: 8px; margin-inline: 16px; min-width: 0; font-size: 12px; }
 .developer-user-control.hidden { display: none; }
 .developer-user-control select { max-width: 240px; min-width: 100px; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; }
+
+html body #startupDialog { position: fixed; inset: 0; margin: auto; height: fit-content; z-index: 401; }
+html body .window-controls { display: flex; align-self: stretch; margin-left: 12px; flex-shrink: 0; }
+html body .window-controls button { display: flex; align-items: center; justify-content: center; width: 42px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--text); }
+html body .window-controls button svg { display: block; width: 12px; height: 12px; flex-shrink: 0; }
+html body .window-controls button:hover { background: var(--surface-hover); }
+html body .window-controls #windowClose:hover { background: #c42b1c; color: white; }
+.window-resize { position: fixed; z-index: 400; }
+.window-resize-left, .window-resize-right { top: 5px; bottom: 5px; width: 4px; cursor: ew-resize; }
+.window-resize-left { left: 0; } .window-resize-right { right: 0; }
+.window-resize-top, .window-resize-bottom { left: 5px; right: 5px; height: 4px; cursor: ns-resize; }
+.window-resize-top { top: 0; } .window-resize-bottom { bottom: 0; }
+.window-resize-top-left, .window-resize-top-right, .window-resize-bottom-left, .window-resize-bottom-right { width: 5px; height: 5px; }
+.window-resize-top-left { top: 0; left: 0; cursor: nwse-resize; }
+.window-resize-top-right { top: 0; right: 0; cursor: nesw-resize; }
+.window-resize-bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
+.window-resize-bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
+.window-maximized .window-resize { display: none; }

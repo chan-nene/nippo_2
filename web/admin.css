@@ -4226,14 +4226,15 @@ html[data-color-palette="blue_white"][data-theme="dark"] body #adminPanel .admin
 }
 
 html[data-theme="dark"] body #adminPanel {
-  --org-calendar-holiday: #263241;
-  --org-calendar-holiday-hover: #304054;
+  --org-calendar-holiday: #3b5068;
+  --org-calendar-holiday-hover: #49617c;
+  --org-calendar-holiday-ink: #edf5ff;
 }
 
 html[data-color-palette="blue_white"][data-theme="dark"] body #adminPanel {
-  --org-calendar-holiday: #1e3a5f;
-  --org-calendar-holiday-hover: #244b73;
-  --org-calendar-holiday-ink: #bfdbfe;
+  --org-calendar-holiday: #284f78;
+  --org-calendar-holiday-hover: #32608e;
+  --org-calendar-holiday-ink: #e6f1ff;
 }
 
 html body #adminPanel .fiscal-calendar-grid {

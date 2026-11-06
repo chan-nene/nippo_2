@@ -124,6 +124,88 @@ def _canonical_file_url_path(value: Any) -> str | None:
         return None
 
 
+def handle_window_action(window, action, drag=None):
+    """Use native move/resize loops so Windows handles monitor edges and sizing."""
+    import ctypes
+    from ctypes import wintypes
+
+    allowed = {"minimize", "maximize", "state", "move", "left", "right", "top",
+               "bottom", "top-left", "top-right", "bottom-left", "bottom-right"}
+    if not isinstance(action, str) or action not in allowed:
+        return {"ok": False}
+    native = getattr(window, "native", None)
+    if native is None:
+        return {"ok": False}
+    hwnd = native.Handle.ToInt64()
+    user32 = ctypes.windll.user32
+    user32.IsZoomed.argtypes = [wintypes.HWND]
+    user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, ctypes.c_size_t, ctypes.c_ssize_t]
+    user32.SendMessageW.restype = ctypes.c_ssize_t
+    if action == "move":
+        # WebView owns the mouse stream. Move explicitly using queued pointer
+        # deltas instead of handing an in-progress gesture to a native modal loop.
+        import math
+        if not isinstance(drag, dict) or not isinstance(drag.get("id"), str):
+            return {"ok": False}
+        fields = ("dx", "dy", "fraction")
+        if any(not isinstance(drag.get(key), (int, float)) or not math.isfinite(drag[key]) for key in fields):
+            return {"ok": False}
+        user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+        user32.GetDpiForWindow.argtypes = [wintypes.HWND]
+        user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND,
+                                       ctypes.c_int, ctypes.c_int,
+                                       ctypes.c_int, ctypes.c_int, wintypes.UINT]
+        saved = getattr(window, "_nippo_drag_state", None)
+        if saved is None or saved[0] != drag["id"]:
+            bounds = wintypes.RECT()
+            user32.GetWindowRect(hwnd, ctypes.byref(bounds))
+            scale = user32.GetDpiForWindow(hwnd) / 96
+            x, y = bounds.left, bounds.top
+            if user32.IsZoomed(hwnd):
+                fraction = min(1, max(0, drag["fraction"]))
+                grabbed_x = bounds.left + (bounds.right - bounds.left) * fraction
+                window.restore()
+                user32.GetWindowRect(hwnd, ctypes.byref(bounds))
+                x = round(grabbed_x - (bounds.right - bounds.left) * fraction)
+            saved = (drag["id"], x, y, scale)
+            window._nippo_drag_state = saved
+        _, x, y, scale = saved
+        user32.SetWindowPos(hwnd, None, round(x + drag["dx"] * scale),
+                            round(y + drag["dy"] * scale), 0, 0, 0x0001 | 0x0004 | 0x0010)
+    elif action == "minimize":
+        window.minimize()
+    elif action == "maximize":
+        if user32.IsZoomed(hwnd):
+            window.restore()
+        else:
+            from System import Action
+            from System.Windows.Forms import Screen
+
+            def set_maximized_bounds():
+                native.MaximizedBounds = Screen.FromControl(native).WorkingArea
+
+            native.Invoke(Action(set_maximized_bounds))
+            window.maximize()
+    elif action != "state":
+        hits = {"move": 2, "left": 10, "right": 11, "top": 12, "top-left": 13,
+                "top-right": 14, "bottom": 15, "bottom-left": 16, "bottom-right": 17}
+        if not user32.IsZoomed(hwnd):
+            point = wintypes.POINT()
+            user32.GetCursorPos(ctypes.byref(point))
+            position = (point.x & 0xFFFF) | ((point.y & 0xFFFF) << 16)
+            from System import Action
+
+            def begin_native_drag():
+                # Capture belongs to the GUI thread. Releasing it on the JS
+                # bridge worker leaves WebView holding the mouse input.
+                user32.ReleaseCapture()
+                command = 0xF000 | (hits[action] - 9)
+                user32.SendMessageW(hwnd, 0x0112, command, position)
+
+            native.Invoke(Action(begin_native_drag))
+    return {"ok": True, "maximized": bool(user32.IsZoomed(hwnd))}
+
+
 # アプリケーションのメイン処理
 def main() -> None:
     base_dir = get_base_dir()
@@ -144,8 +226,12 @@ def main() -> None:
             height=800,
             min_size=(960, 600),
             text_select=True,
+            frameless=True,
+            easy_drag=False,
             background_color=startup_background(theme, palette),
         )
+
+        api._set_window_action_callback(lambda action, drag=None: handle_window_action(window, action, drag))
 
         close_approved = False
 
