@@ -1521,17 +1521,6 @@ function updateViewChrome() {
   }
 }
 
-function syncCurrentUserDisplay() {
-  const userName = $("currentUserName");
-  if (!userName) return;
-  const employeeId = state.employeeId || "未取得";
-  userName.textContent = employeeId;
-  $("currentUserDisplay")?.setAttribute(
-    "aria-label",
-    `ログイン中のユーザー: ${employeeId}`,
-  );
-}
-
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -1579,7 +1568,6 @@ window.addEventListener("pywebviewready", async () => {
   state.accessDenied =
     initial.access_denied === true || initial.employee_registered === false;
   updateViewAvailability();
-  syncCurrentUserDisplay();
   fillSettings(initial.settings || {}, initial.settings_context || initial);
   restoreUiState(initial.settings || {});
   if (state.accessDenied) {

@@ -964,7 +964,6 @@ async function loadData({
     state.reportRefreshPending = false;
   }
   state.displayName = result.data.display_name || result.data.employee_id || "";
-  syncCurrentUserDisplay();
   state.canInputOwnReport = result.data.can_input_own_report !== false;
   state.restrictToSelf = result.data.restrict_to_self === true;
   state.isSuperior = Boolean(result.data.is_superior);

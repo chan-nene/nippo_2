@@ -765,48 +765,6 @@ html body .title-bar-actions {
   line-height: 1;
 }
 
-html body .current-user {
-  overflow: hidden;
-  color: var(--text);
-
-  font-weight: 600;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-html body .current-user-display,
-html body .current-user-icon {
-  display: inline-flex;
-  align-items: center;
-}
-
-html body .current-user-display {
-  height: 32px;
-  min-width: 0;
-
-  line-height: 1;
-}
-
-html body .current-user-icon {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
-  justify-content: center;
-  color: var(--text-muted);
-}
-
-html body .current-user-icon svg {
-  display: block;
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
 html body .header-icon-button {
   display: inline-flex;
   width: 32px;
@@ -821,9 +779,7 @@ html body .header-icon-button {
   line-height: 1;
 }
 
-html:not([data-theme="dark"]) body .header-icon-button,
-html:not([data-theme="dark"]) body .current-user,
-html:not([data-theme="dark"]) body .current-user-icon {
+html:not([data-theme="dark"]) body .header-icon-button {
   color: var(--interactive-ink);
 }
 
@@ -1473,7 +1429,6 @@ html body[data-font-size]
     textarea,
     select,
     label,
-    .current-user,
     .message,
     .empty
   ) {
@@ -1646,18 +1601,6 @@ html body .sidebar-utility-text {
   text-align: center;
 }
 
-html body .current-user-display {
-  max-width: 160px;
-  min-height: 32px;
-  gap: 6px;
-  padding-left: 4px;
-}
-
-html body .current-user {
-  max-width: 120px;
-  font-size: var(--font-13);
-}
-
 /* Rail labels follow the shared secondary text scale. */
 html body[data-font-size] .sidebar .sidebar-item .sidebar-text,
 html body[data-font-size] .sidebar .sidebar-utility-button .sidebar-utility-text {
@@ -1726,7 +1669,7 @@ html body .sidebar-version {
 .developer-user-control select { max-width: 240px; min-width: 100px; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; }
 
 html body #startupDialog { position: fixed; inset: 0; margin: auto; height: fit-content; z-index: 401; }
-html body .window-controls { display: flex; align-self: stretch; margin-left: 12px; flex-shrink: 0; }
+html body .window-controls { display: flex; align-self: stretch; margin-left: 28px; flex-shrink: 0; }
 html body .window-controls button { display: flex; align-items: center; justify-content: center; width: 42px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--text); }
 html body .window-controls button svg { display: block; width: 12px; height: 12px; flex-shrink: 0; }
 html body .window-controls button:hover { background: var(--surface-hover); }

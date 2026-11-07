@@ -1,5 +1,7 @@
 # Local settings and runtime data
 settings.ini
+memo.txt
+.memo-*
 storage.ini
 settings.*.ini
 storage.*.ini

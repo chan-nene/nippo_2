@@ -2378,7 +2378,7 @@ html body .conversation-author {
   flex: 1;
   min-width: 0;
   color: var(--text-muted);
-  font-size: 0.8em;
+  font-size: calc(0.8em + 1px);
   line-height: 1.15;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2398,26 +2398,25 @@ html body .conversation-reaction-badge {
   padding: 0 2px;
   gap: 0px;
   font-family: inherit;
-  border: 1px solid color-mix(in srgb, var(--text-muted) 30%, transparent);
+  border: 0;
   border-radius: 5px;
   background: transparent;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1;
 }
 html body .conversation-reaction-toggle { cursor: pointer; }
+html body .conversation-add-reaction-icon { display: block; width: 16px; height: 16px; flex-shrink: 0; }
+html body .conversation-reaction-toggle:has(.conversation-add-reaction-icon) { min-width: 20px; height: 18px; padding: 0 1px; border-radius: 4px; opacity: 0.4; }
+html body .conversation-card:is(:hover, :focus-within) .conversation-reaction-toggle:has(.conversation-add-reaction-icon),
+html body .conversation-reaction-toggle:has(.conversation-add-reaction-icon)[aria-expanded="true"] { opacity: 1; }
 html body .conversation-reaction-toggle:is(:hover, :focus-visible, [aria-expanded="true"]) {
   color: var(--text-muted);
-  border-color: color-mix(in srgb, var(--text-muted) 55%, transparent);
   background: color-mix(in srgb, var(--text-muted) 8%, transparent);
 }
 html body .conversation-reaction-toggle:focus-visible {
   outline: 1px solid var(--text-muted);
   outline-offset: 2px;
-}
-html body .conversation-reaction-toggle.has-reaction,
-html body .conversation-reaction-badge {
-  border-color: transparent;
 }
 html body .conversation-card:has(.is-editing) .conversation-reaction-toggle { visibility: hidden; }
 html body .conversation-float-menu { position: fixed; z-index: 310; display: block; max-width: calc(100vw - 8px); max-height: min(360px, calc(100vh - 8px)); overflow: auto; padding: 4px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 3px 12px #0003; }
@@ -2428,6 +2427,7 @@ html body .conversation-float-menu button:is(:hover,[aria-pressed="true"]) { bac
 /* Reactions stay in the existing header; a measured compact button replaces
    the full group before it collides with the author. Hidden copies cannot focus. */
 html body .conversation-reactions { display: flex; align-items: center; flex: 0 0 auto; max-width: 100%; position: relative; }
+html body .conversation-card-header:not(.is-tiny) .conversation-reactions { left: 3px; }
 html body .conversation-reactions-full { display: flex; align-items: center; gap: 1px; white-space: nowrap; }
 html body .conversation-reactions-compact { display: none; }
 html body .conversation-card-header.is-compact .conversation-reactions-full {
@@ -2437,7 +2437,6 @@ html body .conversation-card-header.is-compact .conversation-reactions-compact {
 html body .conversation-card-header.is-compact .conversation-author { flex-basis: 0; }
 html body :is(.conversation-reaction-toggle, .conversation-reaction-badge) small { font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 18px; }
 html body .conversation-reaction-toggle.is-selected {
-  border-color: color-mix(in srgb, var(--border-strong) 45%, transparent);
   background: color-mix(in srgb, var(--text-muted) 6%, transparent);
 }
 html body .conversation-reaction-choices { display: flex; gap: 2px; }
@@ -2445,8 +2444,8 @@ html body .conversation-reaction-choices { display: flex; gap: 2px; }
 html body .conversation-card-header.is-tiny { margin-inline: -7px; gap: 0; }
 html body .conversation-card-header.is-tiny .conversation-author { width: 0; flex: 0 0 0; }
 html body .conversation-card-header.is-tiny .conversation-reactions { margin-left: auto; }
-html body .conversation-card-header.is-tiny :is(.conversation-reaction-toggle, .conversation-reaction-badge) { min-width: 20px; font-size: 14px; }
-html body .conversation-card-header.is-tiny :is(.conversation-reaction-toggle, .conversation-reaction-badge) { width: 20px; padding: 0; gap: 0; align-items: flex-start; }
+html body .conversation-card-header.is-tiny :is(.conversation-reaction-toggle, .conversation-reaction-badge) { min-width: 20px; font-size: 15px; }
+html body .conversation-card-header.is-tiny :is(.conversation-reaction-toggle, .conversation-reaction-badge) { width: 20px; padding: 0; gap: 0; }
 html body .conversation-card-header.is-tiny :is(.conversation-reaction-toggle, .conversation-reaction-badge) small {
   position: absolute; right: 0; bottom: 0; font-size: 8px; line-height: 1;
   background: var(--table-cell-bg); border-radius: 2px;

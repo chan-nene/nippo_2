@@ -172,19 +172,20 @@ function renderConversationReactions(row,cell,message,attrs) {
   const canReact=message.author_employee_id!==state.employeeId && canParticipate(row,cell);
   if(!groups.length && !canReact)return '';
   const count=groups.reduce((n,g)=>n+g.count,0);
-  const button=(body,label,selected=false,tooltip='')=>`<button class="conversation-reaction-toggle${selected?' has-reaction is-selected':''}" type="button" data-conversation-action="reaction-menu" data-current-reaction="${own}" ${attrs} aria-label="${escapeHtml(label)}" aria-expanded="false" title="${escapeHtml(tooltip)}">${body}</button>`;
+  const addIcon='<svg class="conversation-add-reaction-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M11 5a8 8 0 1 0 8 8M16 5h6M19 2v6"/><circle cx="8" cy="11" r="1.2" fill="currentColor" stroke="none"/><circle cx="13" cy="11" r="1.2" fill="currentColor" stroke="none"/><path d="M7.5 15h6a3 3 0 0 1-6 0Z" fill="currentColor" stroke="none"/></svg>';
+  const button=(body,label,selected=false,tooltip='')=>`<button class="conversation-reaction-toggle${selected?' has-reaction is-selected':''}" type="button" data-conversation-action="reaction-menu" data-current-reaction="${own}" ${attrs} aria-label="${escapeHtml(label)}" aria-expanded="false" title="${escapeHtml(tooltip || label)}">${body}</button>`;
   const number=n=>n>99?'99+':String(n);
   const badge=(body,label)=>`<span class="conversation-reaction-badge" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">${body}</span>`;
   const full=groups.map(g=>{
     const body=`${g.icon}${g.count>1?`<small>${number(g.count)}</small>`:''}`;
     const label=`${g.label}（${g.names.join('、')}）`;
     return canReact&&g.own ? button(body,`${g.label}：自分のリアクションを変更・解除`,true,label) : badge(body,label);
-  }).join('')+(canReact&&!own?button('+','リアクションを追加'):'');
-  const icon=own ? CONVERSATION_REACTIONS[own][0] : canReact ? '+' : groups[0].icon;
+  }).join('')+(canReact&&!own?button(addIcon,'リアクションを追加'):'');
+  const icon=own ? CONVERSATION_REACTIONS[own][0] : canReact ? addIcon : groups[0].icon;
   const label=canReact ? (own?`${CONVERSATION_REACTIONS[own][1]}：自分のリアクションを変更・解除`:'リアクションを追加') : groups.map(g=>`${g.label} ${g.count}人（${g.names.join('、')}）`).join('、');
   const body=`${icon}${count?`<small>${number(count)}</small>`:''}`;
   const tooltip=groups.map(g=>`${g.label}（${g.names.join('、')}）`).join('\n');
-  const compact=canReact ? button(body,label,Boolean(own),tooltip) : badge(body,tooltip);
+  const compact=canReact ? button(body,label,Boolean(own),!own ? [label,tooltip].filter(Boolean).join('\n') : tooltip) : badge(body,tooltip);
   return `<span class="conversation-reactions"><span class="conversation-reactions-full">${full}</span><span class="conversation-reactions-compact">${compact}</span></span>`;
 }
 function renderConversationMessage(row,cell,message,rowIndex,commentIndex) {
