@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from configparser import ConfigParser, Error as ConfigParserError
 from dataclasses import asdict, dataclass, fields
+from datetime import datetime, timedelta, timezone
 import os
 import tempfile
 from threading import RLock
@@ -269,7 +270,11 @@ class SettingsManager:
     def load(self) -> AppSettings:
         parser = ConfigParser(interpolation=None)
         if not self.path.exists():
-            settings = AppSettings()
+            settings = AppSettings(
+                missing_comment_start_date=datetime.now(
+                    timezone(timedelta(hours=9), "JST")
+                ).date().isoformat()
+            )
             self.save(settings)
             return settings
         parser.read(self.path, encoding="utf-8")
