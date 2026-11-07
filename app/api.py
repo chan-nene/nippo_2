@@ -406,6 +406,7 @@ class DailyReportApi:
             return {
                 "ok": True,
                 "message": "管理を保存しました。",
+                "save_warning": repo.save_warning,
                 "master": master,
                 "revision": new_revision,
             }
@@ -463,6 +464,7 @@ class DailyReportApi:
             return {
                 "ok": True,
                 "message": "組織・ユーザー情報を保存しました。",
+                "save_warning": repo.save_warning,
                 "revisions": new_revisions,
             }
         except AdministrationAccessDeniedError:
@@ -615,6 +617,7 @@ class DailyReportApi:
                 "no_targets": not targets,
                 "result": public_result,
                 "cache_sync_failed": cache_sync_failed,
+                "save_warning": repo.save_warning,
                 "review_patch": review_patch,
                 **{
                     code: True

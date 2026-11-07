@@ -3275,9 +3275,9 @@ async function saveUpdates() {
   }
 
   if (allSaved) {
-    if (displayUpdateFailed) {
+    if (displayUpdateFailed || result.save_warning) {
       notify({
-        text: REPORT_SAVE_CACHE_WARNING,
+        text: [result.save_warning, displayUpdateFailed ? REPORT_SAVE_CACHE_WARNING : ""].filter(Boolean).join("\n"),
         type: "warning",
         autoHide: false,
         source: "save",
@@ -3289,7 +3289,7 @@ async function saveUpdates() {
   }
 
   if (anySaved) {
-    notify({ text: REPORT_SAVE_PARTIAL_MESSAGE, type: "error" });
+    notify({ text: [REPORT_SAVE_PARTIAL_MESSAGE, result.save_warning].filter(Boolean).join("\n"), type: "error" });
     if (displayUpdateFailed) {
       notify({
         text: REPORT_SAVE_CACHE_WARNING,

@@ -87,6 +87,7 @@ class DailyReportRepository:
         self.settings = settings
         self.base_dir = base_dir
         self.load_warnings: list[dict[str, str]] = []
+        self.save_warning = ""
         self.backup_limit = DEFAULT_BACKUP_LIMIT
         self.loaded_common_revisions: dict[str, str] = {}
         self.loaded_report_revisions: dict[str, str] = {}
@@ -1594,7 +1595,6 @@ class DailyReportRepository:
         """Back up the old CSV locally and replace it with a complete staged file."""
         stage_path: Path | None = None
         write_error: Exception | None = None
-        readonly_error: Exception | None = None
         try:
             if not target_path.parent.is_dir():
                 raise FileNotFoundError(
@@ -1640,14 +1640,12 @@ class DailyReportRepository:
                     target_path, exc_info=True,
                 )
                 if write_error is None:
-                    readonly_error = exc
+                    self.save_warning = "データは保存済みですが、CSVを読み取り専用に設定できませんでした。"
             if stage_path is not None:
                 try:
                     stage_path.unlink(missing_ok=True)
                 except Exception:
                     logger.warning("Failed to remove temporary CSV: %s", stage_path, exc_info=True)
-            if readonly_error is not None:
-                raise CsvReadonlyError("CSVを読み取り専用に設定できませんでした。") from readonly_error
         return revision
 
     @staticmethod

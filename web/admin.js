@@ -471,7 +471,7 @@
     byId("adminTeamSaveButton").addEventListener("click", async () => {
       if (isLoading || activeMaster !== "team_master" || !isOrganizationAdministrationDirty()) return;
       if (await save("team_master")) {
-        notify({ text: "チーム管理の変更を保存しました。", type: "success" });
+        notifySaveSuccess({ text: "チーム管理の変更を保存しました。", type: "success" });
       }
     });
     byId("adminCalendarSaveButton").addEventListener("click", () => {
@@ -1135,8 +1135,20 @@
     });
   }
 
+  let saveWarning = "";
+  function notifySaveSuccess(options) {
+    notify({
+      ...options,
+      text: saveWarning || options.text,
+      type: saveWarning ? "warning" : "success",
+      ...(saveWarning ? { autoHide: false } : {}),
+    });
+    saveWarning = "";
+  }
+
   // ユーザー・組織・コメント担当の3マスターを一括保存し、カレンダーは単独保存する。dirty判定・管理者保護・revision更新を通して保存後の基準を確定する。
   async function save(targetMaster = activeMaster, options = {}) {
+    saveWarning = "";
     if (isCalendarReadOnly) return false;
     const saveAdministration = ["user_master", "team_master", "comment_assignment"].includes(targetMaster);
     const saveCalendar = targetMaster === "calendar";
@@ -1197,6 +1209,7 @@
           }
           return false;
         }
+        saveWarning = result.save_warning || "";
         if (userDirty || teamDirty || assignmentDirty) {
           userDraft.originalSnapshot = snapshot(valuesOnly(userDraft));
           userDraft.revision = String(
@@ -1249,6 +1262,7 @@
           }
           return false;
         }
+        saveWarning = result.save_warning || "";
         calendarDraft.originalSnapshot = snapshot(valuesOnly(calendarDraft));
         calendarDraft.revision = String(
           result.revision || calendarDraft.revision,
@@ -1260,7 +1274,7 @@
 
       window.markReportDataStale?.();
       if (saveCalendar && !options.suppressSuccessToast) {
-        notify({
+        notifySaveSuccess({
           text: "カレンダー設定を保存しました。",
           type: "success",
           anchorId: "adminCalendarSaveButton",
@@ -1638,7 +1652,7 @@
     });
     if (saved) {
       closeUserEditorModal(false);
-      notify({
+      notifySaveSuccess({
         text: isNew ? "ユーザーを追加しました。" : "ユーザー情報を更新しました。",
         type: "success",
       });
@@ -1765,7 +1779,10 @@
           failure = details;
         },
       });
-      if (saved) closeTeamEditorModal(false);
+      if (saved) {
+        closeTeamEditorModal(false);
+        if (saveWarning) notifySaveSuccess({});
+      }
       else if (!failure?.conflict && failure?.kind !== "administrator-guard" && teamEditorModalState) {
         teamEditorModalState.saveError = ADMIN_EDITOR_SAVE_ERROR;
         renderTeamEditorDialog();
@@ -1796,7 +1813,7 @@
     });
     if (saved) {
       closeTeamEditorModal(false);
-      notify({
+      notifySaveSuccess({
         text:
           isNew
             ? valueFor(entry, "team_type") === "department"
@@ -2052,7 +2069,7 @@
     }
     draft.selectedId = "";
     render();
-    notify({ text: level === "department" ? "係を追加しました。" : "チームを追加しました。", type: "success" });
+    notifySaveSuccess({ text: level === "department" ? "係を追加しました。" : "チームを追加しました。", type: "success" });
     return true;
   }
 
@@ -2422,7 +2439,7 @@
       if (activeMaster === "team_master" && teamEditorModalState) {
         closeTeamEditorModal(false);
       }
-      notify({
+      notifySaveSuccess({
         scope: "admin",
         text:
           activeMaster === "user_master"
