@@ -271,6 +271,7 @@ class SettingsManager:
         parser = ConfigParser(interpolation=None)
         if not self.path.exists():
             settings = AppSettings(
+                ui_font_size="large",
                 missing_comment_start_date=datetime.now(
                     timezone(timedelta(hours=9), "JST")
                 ).date().isoformat()
